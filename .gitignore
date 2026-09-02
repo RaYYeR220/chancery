@@ -65,3 +65,6 @@ variants/
 # media working files
 video/
 voiceover/
+
+# the template ships; the filled-in copies never do
+!.env.example
