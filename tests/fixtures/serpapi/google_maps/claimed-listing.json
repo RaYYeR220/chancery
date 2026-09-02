@@ -1,0 +1,44 @@
+{
+  "search_metadata": {
+    "id": "68b2f3fdc4d1a9e21",
+    "status": "Success",
+    "json_endpoint": "https://serpapi.com/searches/68b2f3fdc4d1a9e21/68b2f0aa/68b2f3fdc4d1a9e21.json",
+    "created_at": "2026-09-02 11:04:18 UTC",
+    "processed_at": "2026-09-02 11:04:18 UTC",
+    "google_maps_url": "https://serpapi.com/search?engine=google_maps",
+    "raw_html_file": "https://serpapi.com/searches/68b2f3fdc4d1a9e21/68b2f0aa.html",
+    "total_time_taken": 1.09
+  },
+  "search_parameters": {
+    "engine": "google_maps",
+    "q": "Quillsworth Advisory Leeds, United Kingdom",
+    "type": "search"
+  },
+  "place_results": {
+    "title": "Quillsworth Advisory Ltd",
+    "place_id": "ChIJ7c1QaKJ5eUgRq2Xh0mNPPvE",
+    "data_id": "0x48797ba268501cdd:0xf13e4f63d2e165ab",
+    "data_cid": "17383006123001443243",
+    "provider_id": "/g/11f3q0n7cc",
+    "reviews": 63,
+    "rating": 4.7,
+    "unclaimed_listing": false,
+    "type": [
+      "Corporate office",
+      "Financial consultant"
+    ],
+    "address": "14 Park Row, Leeds LS1 5HD, United Kingdom",
+    "open_state": "Open - Closes 6 PM",
+    "phone": "+44 113 496 0188",
+    "website": "https://quillsworth.com/",
+    "link": "https://www.google.com/maps/place/Quillsworth+Advisory+Ltd/@53.7981,-1.5471,17z/data=!3m1!4b1",
+    "gps_coordinates": {
+      "latitude": 53.7981,
+      "longitude": -1.5471
+    },
+    "service_options": {
+      "onsite_services": true,
+      "online_appointments": true
+    }
+  }
+}

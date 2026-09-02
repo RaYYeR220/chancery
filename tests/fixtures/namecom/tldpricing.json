@@ -1,0 +1,20 @@
+{
+  "results": [
+    {
+      "tld": "com",
+      "registrationPrice": 10.99,
+      "renewalPrice": 12.99,
+      "transferPrice": 10.99,
+      "premium": false
+    },
+    {
+      "tld": "dev",
+      "registrationPrice": 14.99,
+      "renewalPrice": 14.99,
+      "transferPrice": 14.99,
+      "premium": false
+    }
+  ],
+  "nextPage": 2,
+  "lastPage": 9
+}

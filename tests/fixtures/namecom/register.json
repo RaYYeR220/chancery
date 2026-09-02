@@ -1,0 +1,14 @@
+{
+  "domain": {
+    "domainName": "chancery-writ.com",
+    "nameservers": ["ns1chancery.name.com", "ns2chancery.name.com"],
+    "privacyEnabled": true,
+    "locked": true,
+    "autorenewEnabled": true,
+    "expireDate": "2027-09-03T00:00:00Z",
+    "createDate": "2026-09-03T00:00:00Z",
+    "renewalPrice": 12.99
+  },
+  "order": 449283,
+  "totalPaid": 10.99
+}

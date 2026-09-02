@@ -1,0 +1,43 @@
+{
+  "search_metadata": {
+    "id": "68b2f3f3c4d1a9e11",
+    "status": "Success",
+    "json_endpoint": "https://serpapi.com/searches/68b2f3f3c4d1a9e11/68b2f0aa/68b2f3f3c4d1a9e11.json",
+    "created_at": "2026-09-02 11:04:18 UTC",
+    "processed_at": "2026-09-02 11:04:18 UTC",
+    "google_news_url": "https://serpapi.com/search?engine=google_news",
+    "raw_html_file": "https://serpapi.com/searches/68b2f3f3c4d1a9e11/68b2f0aa.html",
+    "total_time_taken": 0.96
+  },
+  "search_parameters": {
+    "engine": "google_news",
+    "q": "Quillsworth Advisory Ltd",
+    "gl": "uk",
+    "hl": "en"
+  },
+  "news_results": [
+    {
+      "position": 1,
+      "title": "Quillsworth Advisory opens second office in Manchester",
+      "source": {
+        "name": "Insider Media",
+        "authors": [
+          "Jo Bexley"
+        ]
+      },
+      "link": "https://www.insidermedia.com/news/north-west/quillsworth-advisory-manchester",
+      "date": "07/30/2026, 08:15 AM, +0000 UTC",
+      "snippet": "The Leeds corporate finance boutique adds six staff in the north west."
+    },
+    {
+      "position": 2,
+      "title": "Mid-market M&A volumes steady in H1",
+      "source": {
+        "name": "Financial News"
+      },
+      "link": "https://www.fnlondon.com/articles/mid-market-ma-h1-2026",
+      "date": "07/12/2026, 06:00 AM, +0000 UTC",
+      "snippet": "Advisers including Quillsworth Advisory report a stable pipeline."
+    }
+  ]
+}

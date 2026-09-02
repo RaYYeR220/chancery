@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "us registration requirements",
+  "type": "object",
+  "properties": {
+    "nexusCategory": {
+      "type": "string",
+      "enum": ["C11", "C12", "C21", "C31", "C32"],
+      "description": "US Nexus category asserted by the registrant"
+    },
+    "applicationPurpose": {
+      "type": "string",
+      "enum": ["P1", "P2", "P3", "P4", "P5"]
+    }
+  },
+  "required": ["nexusCategory", "applicationPurpose"]
+}

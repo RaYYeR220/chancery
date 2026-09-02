@@ -1,0 +1,8 @@
+{
+  "results": [
+    { "domainName": "chancery-writ.com", "available": true },
+    { "domainName": "google.com", "available": false }
+  ],
+  "total": 2,
+  "removed": 1
+}

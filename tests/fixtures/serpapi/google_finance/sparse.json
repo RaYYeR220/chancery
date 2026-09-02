@@ -1,0 +1,16 @@
+{
+  "search_metadata": {
+    "id": "68b2f40cc4d1a9e36",
+    "status": "Success",
+    "json_endpoint": "https://serpapi.com/searches/68b2f40cc4d1a9e36/68b2f0aa/68b2f40cc4d1a9e36.json",
+    "created_at": "2026-09-02 11:04:18 UTC",
+    "processed_at": "2026-09-02 11:04:18 UTC",
+    "google_finance_url": "https://serpapi.com/search?engine=google_finance",
+    "raw_html_file": "https://serpapi.com/searches/68b2f40cc4d1a9e36/68b2f0aa.html",
+    "total_time_taken": 0.7
+  },
+  "search_parameters": {
+    "engine": "google_finance",
+    "q": "QWA:LON"
+  }
+}

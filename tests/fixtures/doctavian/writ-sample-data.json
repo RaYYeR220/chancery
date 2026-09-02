@@ -1,0 +1,156 @@
+{
+  "Writ": [
+    {
+      "Id": "writ_01JBQ7Y3M4K8Z2X9V6N0P5R7T",
+      "Version": "2",
+      "PrincipalName": "Meridian Analytics Limited",
+      "PrincipalEmail": "ops@meridian-analytics.ie",
+      "PrincipalVerified": "true",
+      "AgentLabel": "Chancery Registrar Agent",
+      "AgentDomain": "ops.meridian-analytics.ie",
+      "AgentPublicKey": "k2c9Xr7dQ1sT4uV8wY0zA3bC6dE9fG2hJ5kL8mN1pQ4",
+      "Jurisdiction": "IE",
+      "JurisdictionName": "Ireland",
+      "JurisdictionIsEea": "true",
+      "Currency": "EUR",
+      "CurrencySymbol": "€",
+      "EffectiveFrom": "2026-09-03",
+      "TermDays": "90",
+      "EscalationPercent": "25",
+      "EscalationFloorMinor": "100000",
+      "DailyCapMinor": "50000",
+      "Grants": [
+        {
+          "Ref": "3(a)",
+          "ActKind": "domain.register",
+          "ActTitle": "Registration of domain names",
+          "ActNarrative": "to register domain names in the Principal's name and to pay the registry and registrar fees arising",
+          "HasCap": "true",
+          "CapMinor": "150000",
+          "CapWindow": "in any calendar month",
+          "CountMax": "25",
+          "CountWindow": "in any calendar month",
+          "AllowlistField": "tld",
+          "AllowlistValues": "com, io, ie, dev",
+          "PatternField": "domainName",
+          "Pattern": "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$",
+          "DiligenceChecks": "trademark clear, no brand collision",
+          "JurisdictionAllowed": "IE, DE, FR, NL",
+          "EscalationMinor": "50000",
+          "Limits": [
+            {
+              "SubRef": "3(a)(i)",
+              "Kind": "amount",
+              "Text": "Cumulative spend may not exceed 1500.00 EUR in any calendar month."
+            },
+            {
+              "SubRef": "3(a)(ii)",
+              "Kind": "count",
+              "Text": "The act may be performed at most 25 times in any calendar month."
+            },
+            {
+              "SubRef": "3(a)(iii)",
+              "Kind": "allowlist",
+              "Text": "The value of \"tld\" must be one of: com, io, ie, dev."
+            },
+            {
+              "SubRef": "3(a)(iv)",
+              "Kind": "pattern",
+              "Text": "The value of \"domainName\" must match the pattern ^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$."
+            }
+          ]
+        },
+        {
+          "Ref": "3(b)",
+          "ActKind": "domain.renew",
+          "ActTitle": "Renewal of domain names",
+          "ActNarrative": "to renew domain names already held in the Principal's name before their expiry",
+          "HasCap": "true",
+          "CapMinor": "90000",
+          "CapWindow": "in any calendar month",
+          "CountMax": "200",
+          "CountWindow": "in any calendar month",
+          "AllowlistField": "",
+          "AllowlistValues": "",
+          "PatternField": "",
+          "Pattern": "",
+          "DiligenceChecks": "",
+          "JurisdictionAllowed": "",
+          "EscalationMinor": "",
+          "Limits": [
+            {
+              "SubRef": "3(b)(i)",
+              "Kind": "amount",
+              "Text": "Cumulative spend may not exceed 900.00 EUR in any calendar month."
+            },
+            {
+              "SubRef": "3(b)(ii)",
+              "Kind": "count",
+              "Text": "The act may be performed at most 200 times in any calendar month."
+            }
+          ]
+        },
+        {
+          "Ref": "3(c)",
+          "ActKind": "dns.write",
+          "ActTitle": "Modification of DNS records",
+          "ActNarrative": "to create, amend and delete DNS records within the zones listed below",
+          "HasCap": "false",
+          "CapMinor": "0",
+          "CapWindow": "",
+          "CountMax": "500",
+          "CountWindow": "in any calendar day",
+          "AllowlistField": "zone",
+          "AllowlistValues": "meridian-analytics.ie, meridian-analytics.com",
+          "PatternField": "",
+          "Pattern": "",
+          "DiligenceChecks": "",
+          "JurisdictionAllowed": "IE",
+          "EscalationMinor": "",
+          "Limits": [
+            {
+              "SubRef": "3(c)(i)",
+              "Kind": "count",
+              "Text": "The act may be performed at most 500 times in any calendar day."
+            },
+            {
+              "SubRef": "3(c)(ii)",
+              "Kind": "allowlist",
+              "Text": "The value of \"zone\" must be one of: meridian-analytics.ie, meridian-analytics.com."
+            }
+          ]
+        },
+        {
+          "Ref": "3(d)",
+          "ActKind": "document.send_for_signature",
+          "ActTitle": "Dispatch of documents for signature",
+          "ActNarrative": "to dispatch documents to named counterparties for electronic signature",
+          "HasCap": "true",
+          "CapMinor": "25000",
+          "CapWindow": "over the term of this writ",
+          "CountMax": "",
+          "CountWindow": "",
+          "AllowlistField": "counterpartyDomain",
+          "AllowlistValues": "kpmg.ie, matheson.com, revenue.ie",
+          "PatternField": "",
+          "Pattern": "",
+          "DiligenceChecks": "counterparty exists",
+          "JurisdictionAllowed": "",
+          "EscalationMinor": "10000",
+          "Limits": [
+            {
+              "SubRef": "3(d)(i)",
+              "Kind": "amount",
+              "Text": "Cumulative spend may not exceed 250.00 EUR over the term of this writ."
+            },
+            {
+              "SubRef": "3(d)(ii)",
+              "Kind": "allowlist",
+              "Text": "The value of \"counterpartyDomain\" must be one of: kpmg.ie, matheson.com, revenue.ie."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

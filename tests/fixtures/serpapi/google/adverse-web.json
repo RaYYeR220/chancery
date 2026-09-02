@@ -1,0 +1,37 @@
+{
+  "search_metadata": {
+    "id": "68b2f3ecc4d1a9e4",
+    "status": "Success",
+    "json_endpoint": "https://serpapi.com/searches/68b2f3ecc4d1a9e4/68b2f0aa/68b2f3ecc4d1a9e4.json",
+    "created_at": "2026-09-02 11:04:18 UTC",
+    "processed_at": "2026-09-02 11:04:18 UTC",
+    "google_url": "https://serpapi.com/search?engine=google",
+    "raw_html_file": "https://serpapi.com/searches/68b2f3ecc4d1a9e4/68b2f0aa.html",
+    "total_time_taken": 1.22
+  },
+  "search_parameters": {
+    "engine": "google",
+    "q": "\"Northwind Logistics Group, Inc.\" (fraud OR lawsuit OR investigation OR bankruptcy OR sanctions)"
+  },
+  "search_information": {
+    "query_displayed": "\"Northwind Logistics Group, Inc.\"",
+    "total_results": 1180,
+    "organic_results_state": "Results for exact spelling"
+  },
+  "organic_results": [
+    {
+      "position": 1,
+      "title": "SEC charges Austin freight broker Northwind Logistics Group over billing",
+      "link": "https://www.sec.gov/litigation/litreleases/2026/lr-26188",
+      "displayed_link": "https://www.sec.gov › litigation › litreleases",
+      "snippet": "The Securities and Exchange Commission today charged Northwind Logistics Group, Inc. and two former officers with fraud in connection with undisclosed freight billing adjustments."
+    },
+    {
+      "position": 2,
+      "title": "Northwind Logistics Group faces class action in W.D. Tex.",
+      "link": "https://news.bloomberglaw.com/litigation/northwind-logistics-class-action-2026",
+      "displayed_link": "https://news.bloomberglaw.com › litigation",
+      "snippet": "Investors filed a class action against Northwind Logistics Group, Inc. alleging misstatements about contracted freight volume."
+    }
+  ]
+}

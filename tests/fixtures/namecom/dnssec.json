@@ -1,0 +1,11 @@
+{
+  "dnssec": [
+    {
+      "domainName": "chancery-writ.com",
+      "keyTag": 21212,
+      "algorithm": 13,
+      "digestType": 2,
+      "digest": "E2D3C916F6DEEAC73294E8268FB5885044A833FC5459588F4A9184CFC41A5766"
+    }
+  ]
+}

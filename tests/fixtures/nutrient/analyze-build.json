@@ -1,0 +1,17 @@
+{
+  "cost": 3.5,
+  "required_features": {
+    "ocr": {
+      "unit_cost": 1,
+      "unit_type": "per_output_page",
+      "units": 1,
+      "usage": ["$.actions[0]"]
+    },
+    "redaction": {
+      "unit_cost": 2.5,
+      "unit_type": "per_use",
+      "units": 1,
+      "usage": ["$.actions[1]", "$.actions[2]"]
+    }
+  }
+}

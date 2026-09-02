@@ -1,0 +1,104 @@
+{
+  "search_metadata": {
+    "id": "68b2f3f5c4d1a9e13",
+    "status": "Success",
+    "json_endpoint": "https://serpapi.com/searches/68b2f3f5c4d1a9e13/68b2f0aa/68b2f3f5c4d1a9e13.json",
+    "created_at": "2026-09-02 11:04:18 UTC",
+    "processed_at": "2026-09-02 11:04:18 UTC",
+    "google_patents_url": "https://serpapi.com/search?engine=google_patents",
+    "raw_html_file": "https://serpapi.com/searches/68b2f3f5c4d1a9e13/68b2f0aa.html",
+    "total_time_taken": 1.22
+  },
+  "search_parameters": {
+    "engine": "google_patents",
+    "q": "Northwind Logistics Group, Inc.",
+    "litigation": "true",
+    "num": "20"
+  },
+  "organic_results": [
+    {
+      "position": 1,
+      "rank": 0,
+      "patent_id": "patent/US10482419B2/en",
+      "serpapi_link": "https://serpapi.com/search.json?engine=google_patents_details&patent_id=patent%2FUS10482419B2%2Fen",
+      "title": "Dynamic freight load consolidation system",
+      "snippet": "A system for consolidating less-than-truckload shipments into dynamically formed multi-stop loads based on real-time capacity signals.",
+      "priority_date": "2016-04-12",
+      "filing_date": "2016-04-12",
+      "grant_date": "2019-11-19",
+      "publication_date": "2019-11-19",
+      "inventor": "Priya Raghunathan",
+      "assignee": "Northwind Logistics Group, Inc.",
+      "publication_number": "US10482419B2",
+      "language": "en",
+      "country_status": {
+        "US": "ACTIVE",
+        "EP": "ACTIVE",
+        "WO": "NOT_ACTIVE"
+      },
+      "pdf": "https://patentimages.storage.googleapis.com/9c/1f/US10482419.pdf",
+      "litigation": true,
+      "figures": [
+        {
+          "thumbnail": "https://patentimages.storage.googleapis.com/thumb/US10482419-1.png"
+        }
+      ]
+    },
+    {
+      "position": 2,
+      "rank": 1,
+      "patent_id": "patent/US11238412B1/en",
+      "serpapi_link": "https://serpapi.com/search.json?engine=google_patents_details&patent_id=patent%2FUS11238412B1%2Fen",
+      "title": "Method for predictive drayage appointment scheduling",
+      "snippet": "Techniques for scheduling drayage appointments at container terminals using predicted dwell times.",
+      "priority_date": "2019-02-27",
+      "filing_date": "2019-02-27",
+      "grant_date": "2022-02-01",
+      "publication_date": "2022-02-01",
+      "inventor": "Priya Raghunathan, Dale W. Foss",
+      "assignee": "Northwind Logistics Group, Inc.",
+      "publication_number": "US11238412B1",
+      "language": "en",
+      "country_status": {
+        "US": "ACTIVE"
+      },
+      "litigations": [
+        {
+          "case_number": "6:24-cv-00512",
+          "court": "W.D. Tex.",
+          "filed": "2024-09-30",
+          "parties": "Palisade Freight Systems LLC v. Northwind Logistics Group, Inc.",
+          "type": "Infringement"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "assignee": [
+      {
+        "key": "Northwind Logistics Group, Inc.",
+        "percentage": 66,
+        "frequency": 2
+      },
+      {
+        "key": "Palisade Freight Systems LLC",
+        "percentage": 34,
+        "frequency": 1
+      }
+    ],
+    "inventor": [
+      {
+        "key": "Priya Raghunathan",
+        "percentage": 66,
+        "frequency": 2
+      }
+    ],
+    "cpc": [
+      {
+        "key": "G06Q10/08355",
+        "percentage": 50,
+        "frequency": 2
+      }
+    ]
+  }
+}

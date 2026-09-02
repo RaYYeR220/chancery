@@ -1,0 +1,64 @@
+{
+  "search_metadata": {
+    "id": "68b2f3f2c4d1a9e10",
+    "status": "Success",
+    "json_endpoint": "https://serpapi.com/searches/68b2f3f2c4d1a9e10/68b2f0aa/68b2f3f2c4d1a9e10.json",
+    "created_at": "2026-09-02 11:04:18 UTC",
+    "processed_at": "2026-09-02 11:04:18 UTC",
+    "google_news_url": "https://serpapi.com/search?engine=google_news",
+    "raw_html_file": "https://serpapi.com/searches/68b2f3f2c4d1a9e10/68b2f0aa.html",
+    "total_time_taken": 0.83
+  },
+  "search_parameters": {
+    "engine": "google_news",
+    "q": "Northwind Logistics Group, Inc.",
+    "gl": "us",
+    "hl": "en"
+  },
+  "news_results": [
+    {
+      "position": 1,
+      "title": "SEC opens fraud investigation into Northwind Logistics Group",
+      "source": {
+        "name": "Reuters",
+        "icon": "https://encrypted-tbn0.gstatic.com/faviconV2?url=https://www.reuters.com",
+        "authors": [
+          "Marta Feld"
+        ]
+      },
+      "link": "https://www.reuters.com/legal/sec-northwind-logistics-investigation-2026-08-14/",
+      "thumbnail": "https://news.google.com/api/attachments/CC8iK0NnNXFTa1Y1",
+      "date": "08/14/2026, 07:00 AM, +0000 UTC",
+      "snippet": "The regulator is examining freight billing adjustments disclosed in the company's restated 2025 accounts."
+    },
+    {
+      "position": 2,
+      "title": "Northwind Logistics Group named in wire fraud indictment of former CFO",
+      "source": {
+        "name": "Austin Business Journal",
+        "authors": [
+          "Ray Ozuna"
+        ]
+      },
+      "link": "https://www.bizjournals.com/austin/news/2026/08/22/northwind-logistics-indictment.html",
+      "date": "08/22/2026, 13:40 PM, +0000 UTC",
+      "snippet": "A federal grand jury returned a four-count indictment alleging wire fraud tied to shipper rebates."
+    },
+    {
+      "position": 3,
+      "title": "Freight rates soften across Texas lanes",
+      "source": {
+        "name": "FreightWaves"
+      },
+      "link": "https://www.freightwaves.com/news/texas-lane-rates-august-2026",
+      "date": "08/25/2026, 09:12 AM, +0000 UTC",
+      "snippet": "Spot rates out of Laredo fell 4% week over week."
+    }
+  ],
+  "menu_links": [
+    {
+      "title": "Business",
+      "topic_token": "CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx6TVdZU0FtVnVHZ0pWVXlnQVAB"
+    }
+  ]
+}

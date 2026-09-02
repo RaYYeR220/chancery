@@ -1,0 +1,44 @@
+{
+  "search_metadata": {
+    "id": "68b2f3f8c4d1a9e16",
+    "status": "Success",
+    "json_endpoint": "https://serpapi.com/searches/68b2f3f8c4d1a9e16/68b2f0aa/68b2f3f8c4d1a9e16.json",
+    "created_at": "2026-09-02 11:04:18 UTC",
+    "processed_at": "2026-09-02 11:04:18 UTC",
+    "google_scholar_case_law_url": "https://serpapi.com/search?engine=google_scholar_case_law",
+    "raw_html_file": "https://serpapi.com/searches/68b2f3f8c4d1a9e16/68b2f0aa.html",
+    "total_time_taken": 1.61
+  },
+  "search_parameters": {
+    "engine": "google_scholar_case_law",
+    "q": "\"Northwind Logistics\" trademark opposition infringement"
+  },
+  "case_results": [
+    {
+      "position": 0,
+      "title": "Northwind Logistics Group, Inc. v. Northwind Freight Holdings LLC",
+      "result_id": "1088293747483920172",
+      "link": "https://scholar.google.com/scholar_case?case=1088293747483920172",
+      "publication_info": {
+        "summary": "Opposition No. 91278334, 2024 TTAB LEXIS 118 (T.T.A.B. Mar. 8, 2024)"
+      },
+      "snippet": "Opposer Northwind Logistics Group, Inc. opposes registration of NORTHWIND FREIGHT on grounds of likelihood of confusion under Section 2(d) of the Lanham Act. Opposition sustained.",
+      "inline_links": {
+        "cited_by": {
+          "total": 4,
+          "link": "https://scholar.google.com/scholar?cites=1088"
+        }
+      }
+    },
+    {
+      "position": 1,
+      "title": "Northwind Logistics Group, Inc. v. Cardinal Drayage Co.",
+      "result_id": "7712339048812203311",
+      "link": "https://scholar.google.com/scholar_case?case=7712339048812203311",
+      "publication_info": {
+        "summary": "No. 1:23-cv-00884 (W.D. Tex. 2023)"
+      },
+      "snippet": "Plaintiff asserts trademark infringement and unfair competition arising from defendant's use of the NORTHWIND mark in interstate freight services."
+    }
+  ]
+}

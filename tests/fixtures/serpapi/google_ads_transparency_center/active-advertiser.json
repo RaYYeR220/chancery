@@ -1,0 +1,41 @@
+{
+  "search_metadata": {
+    "id": "68b2f405c4d1a9e29",
+    "status": "Success",
+    "json_endpoint": "https://serpapi.com/searches/68b2f405c4d1a9e29/68b2f0aa/68b2f405c4d1a9e29.json",
+    "created_at": "2026-09-02 11:04:18 UTC",
+    "processed_at": "2026-09-02 11:04:18 UTC",
+    "google_ads_transparency_center_url": "https://serpapi.com/search?engine=google_ads_transparency_center",
+    "raw_html_file": "https://serpapi.com/searches/68b2f405c4d1a9e29/68b2f0aa.html",
+    "total_time_taken": 0.96
+  },
+  "search_parameters": {
+    "engine": "google_ads_transparency_center",
+    "text": "Northwind Logistics",
+    "num": "20"
+  },
+  "ad_creatives": [
+    {
+      "position": 1,
+      "advertiser": "Northwind Logistics Group, Inc.",
+      "advertiser_id": "AR13094882731049582593",
+      "creative_id": "CR04918273645102938471",
+      "format": "text",
+      "first_shown": "2024-03-11",
+      "last_shown": "2026-08-28",
+      "target_domain": "northwindlogistics.com",
+      "link": "https://adstransparency.google.com/advertiser/AR13094882731049582593/creative/CR04918273645102938471"
+    },
+    {
+      "position": 2,
+      "advertiser": "Northwind Logistics Group, Inc.",
+      "advertiser_id": "AR13094882731049582593",
+      "creative_id": "CR11928374650192837465",
+      "format": "image",
+      "first_shown": "2025-11-02",
+      "last_shown": "2026-08-30",
+      "target_domain": "northwindlogistics.com",
+      "link": "https://adstransparency.google.com/advertiser/AR13094882731049582593/creative/CR11928374650192837465"
+    }
+  ]
+}

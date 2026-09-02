@@ -1,0 +1,31 @@
+{
+  "records": [
+    {
+      "id": 1001,
+      "domainName": "chancery-writ.com",
+      "host": "",
+      "fqdn": "chancery-writ.com.",
+      "type": "A",
+      "answer": "203.0.113.10",
+      "ttl": 300
+    },
+    {
+      "id": 1002,
+      "domainName": "chancery-writ.com",
+      "host": "_writ",
+      "fqdn": "_writ.chancery-writ.com.",
+      "type": "TXT",
+      "answer": "v=WRIT1; st=active; k=cHVibGljLWtleQ; h=ZG9jLWhhc2g; u=https://chancery.example/w/1.pdf; exp=1790000000",
+      "ttl": 300
+    },
+    {
+      "id": 1003,
+      "domainName": "chancery-writ.com",
+      "host": "_writ",
+      "fqdn": "_writ.chancery-writ.com.",
+      "type": "TXT",
+      "answer": "google-site-verification=not-a-writ",
+      "ttl": 300
+    }
+  ]
+}

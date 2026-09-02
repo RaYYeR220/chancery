@@ -1,0 +1,12 @@
+{
+  "error": {
+    "details": "Invalid build instructions.",
+    "requestId": "req_9f2c41",
+    "status": 400,
+    "supportUrl": "https://support.nutrient.io/hc/en-us/requests/new",
+    "failingPaths": [
+      { "path": "$.actions[1].strategyOptions.preset", "details": "unknown preset" },
+      { "path": "$.output.conformance" }
+    ]
+  }
+}

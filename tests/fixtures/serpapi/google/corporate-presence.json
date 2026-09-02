@@ -1,0 +1,44 @@
+{
+  "search_metadata": {
+    "id": "68b2f3ebc4d1a9e3",
+    "status": "Success",
+    "json_endpoint": "https://serpapi.com/searches/68b2f3ebc4d1a9e3/68b2f0aa/68b2f3ebc4d1a9e3.json",
+    "created_at": "2026-09-02 11:04:18 UTC",
+    "processed_at": "2026-09-02 11:04:18 UTC",
+    "google_url": "https://serpapi.com/search?engine=google",
+    "raw_html_file": "https://serpapi.com/searches/68b2f3ebc4d1a9e3/68b2f0aa.html",
+    "total_time_taken": 1.09
+  },
+  "search_parameters": {
+    "engine": "google",
+    "q": "\"Quillsworth Advisory Ltd\" (site:linkedin.com/company OR site:opencorporates.com OR site:sec.gov OR site:crunchbase.com OR site:companieshouse.gov.uk)"
+  },
+  "search_information": {
+    "query_displayed": "\"Quillsworth Advisory Ltd\"",
+    "total_results": 41,
+    "organic_results_state": "Results for exact spelling"
+  },
+  "organic_results": [
+    {
+      "position": 1,
+      "title": "Quillsworth Advisory Ltd | LinkedIn",
+      "link": "https://www.linkedin.com/company/quillsworth-advisory",
+      "displayed_link": "https://www.linkedin.com › company › quillsworth-advisory",
+      "snippet": "Quillsworth Advisory Ltd | 218 followers on LinkedIn. Independent corporate finance advisory for founder-led businesses. Leeds, United Kingdom. 24 employees."
+    },
+    {
+      "position": 2,
+      "title": "QUILLSWORTH ADVISORY LTD :: OpenCorporates",
+      "link": "https://opencorporates.com/companies/gb/11482930",
+      "displayed_link": "https://opencorporates.com › companies › gb",
+      "snippet": "Free company information about QUILLSWORTH ADVISORY LTD, company number 11482930, incorporated 24 July 2018, registered address 14 Park Row, Leeds LS1 5HD. Status: Active."
+    },
+    {
+      "position": 3,
+      "title": "QUILLSWORTH ADVISORY LTD - Filing history - Companies House",
+      "link": "https://find-and-update.company-information.service.gov.uk/company/11482930/filing-history",
+      "displayed_link": "https://find-and-update.company-information.service.gov.uk",
+      "snippet": "Accounts made up to 31 March 2026 filed 12 June 2026."
+    }
+  ]
+}

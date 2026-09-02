@@ -1,0 +1,74 @@
+{
+  "search_metadata": {
+    "id": "68b2f3e9c4d1a9e1",
+    "status": "Success",
+    "json_endpoint": "https://serpapi.com/searches/68b2f3e9c4d1a9e1/68b2f0aa/68b2f3e9c4d1a9e1.json",
+    "created_at": "2026-09-02 11:04:18 UTC",
+    "processed_at": "2026-09-02 11:04:18 UTC",
+    "google_url": "https://serpapi.com/search?engine=google",
+    "raw_html_file": "https://serpapi.com/searches/68b2f3e9c4d1a9e1/68b2f0aa.html",
+    "total_time_taken": 0.83
+  },
+  "search_parameters": {
+    "engine": "google",
+    "q": "\"Northwind Logistics\" trademark (site:tsdr.uspto.gov OR site:tmsearch.uspto.gov OR site:trademarks.justia.com OR site:euipo.europa.eu OR site:branddb.wipo.int)",
+    "google_domain": "google.com",
+    "device": "desktop"
+  },
+  "search_information": {
+    "query_displayed": "\"Northwind Logistics\" trademark (site:tsdr.uspto.gov OR site:trademarks.justia.com)",
+    "total_results": 214,
+    "time_taken_displayed": 0.31,
+    "organic_results_state": "Results for exact spelling"
+  },
+  "organic_results": [
+    {
+      "position": 1,
+      "title": "NORTHWIND LOGISTICS Trademark of Northwind Logistics Group, Inc.",
+      "link": "https://trademarks.justia.com/974/12/northwind-logistics-97412388.html",
+      "redirect_link": "https://www.google.com/url?sa=t&url=https://trademarks.justia.com/974/12/northwind-logistics-97412388.html",
+      "displayed_link": "https://trademarks.justia.com › 974 › 12",
+      "source": "Justia Trademarks",
+      "snippet": "NORTHWIND LOGISTICS - Serial Number 97412388 - Registration Number 6892147 - Status: LIVE/REGISTRATION/Issued and Active - Owner: Northwind Logistics Group, Inc. (Delaware corporation) - Goods and Services: IC 039. US 100 105. G & S: Freight brokerage; transport and storage of goods.",
+      "snippet_highlighted_words": [
+        "NORTHWIND LOGISTICS",
+        "LIVE"
+      ]
+    },
+    {
+      "position": 2,
+      "title": "Trademark Status & Document Retrieval - NORTHWIND LOGISTICS",
+      "link": "https://tsdr.uspto.gov/statusview/sn97412388",
+      "displayed_link": "https://tsdr.uspto.gov › statusview",
+      "source": "United States Patent and Trademark Office",
+      "snippet": "Mark: NORTHWIND LOGISTICS. US Serial Number: 97412388. Registration Number: 6892147. Filed: 2022-05-17. Registered: 2023-09-12. Live/Dead Indicator: LIVE. Mark Type: Service Mark, Principal Register.",
+      "snippet_highlighted_words": [
+        "LIVE"
+      ]
+    },
+    {
+      "position": 3,
+      "title": "NORTHWIND LOGISTICS SOLUTIONS - Trademark Details",
+      "link": "https://trademarks.justia.com/862/11/northwind-logistics-solutions-86211455.html",
+      "displayed_link": "https://trademarks.justia.com › 862 › 11",
+      "source": "Justia Trademarks",
+      "snippet": "NORTHWIND LOGISTICS SOLUTIONS - Serial Number 86211455 - Status: DEAD/ABANDONED - Failure To Respond Or Late Response. Filed 2014-03-04, abandoned 2015-11-30."
+    },
+    {
+      "position": 4,
+      "title": "Freight forwarding glossary - what is a logistics broker?",
+      "link": "https://www.freightwaves.com/news/logistics-broker-glossary",
+      "displayed_link": "https://www.freightwaves.com › news",
+      "snippet": "A logistics broker arranges transport on behalf of a shipper..."
+    }
+  ],
+  "pagination": {
+    "current": 1,
+    "next": "https://www.google.com/search?q=...&start=10"
+  },
+  "serpapi_pagination": {
+    "current": 1,
+    "next_link": "https://serpapi.com/search.json?engine=google&q=...&start=10",
+    "next": "https://serpapi.com/search.json?engine=google&q=...&start=10"
+  }
+}

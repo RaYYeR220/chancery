@@ -1,0 +1,25 @@
+{
+  "results": [
+    {
+      "domainName": "chancery-writ.com",
+      "sld": "chancery-writ",
+      "tld": "com",
+      "purchasable": true,
+      "premium": false,
+      "purchasePrice": 10.99,
+      "renewalPrice": 12.99,
+      "purchaseType": "registration"
+    },
+    {
+      "domainName": "google.com",
+      "sld": "google",
+      "tld": "com",
+      "purchasable": false,
+      "premium": false,
+      "purchasePrice": 0,
+      "renewalPrice": 0,
+      "purchaseType": "registration",
+      "reason": "Domain is not available for registration"
+    }
+  ]
+}

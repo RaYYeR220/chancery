@@ -1,0 +1,14 @@
+{
+  "search_metadata": {
+    "id": "68b2f0aa9c4d1a9e77",
+    "status": "Error",
+    "error": "Google hasn't returned any results for this query.",
+    "created_at": "2026-09-02 11:09:41 UTC",
+    "processed_at": "2026-09-02 11:09:42 UTC",
+    "total_time_taken": 2.14
+  },
+  "search_parameters": {
+    "engine": "google",
+    "q": "\"Aetherline Freight\" trademark"
+  }
+}

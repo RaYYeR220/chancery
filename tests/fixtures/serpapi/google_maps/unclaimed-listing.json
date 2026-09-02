@@ -1,0 +1,55 @@
+{
+  "search_metadata": {
+    "id": "68b2f3fcc4d1a9e20",
+    "status": "Success",
+    "json_endpoint": "https://serpapi.com/searches/68b2f3fcc4d1a9e20/68b2f0aa/68b2f3fcc4d1a9e20.json",
+    "created_at": "2026-09-02 11:04:18 UTC",
+    "processed_at": "2026-09-02 11:04:18 UTC",
+    "google_maps_url": "https://serpapi.com/search?engine=google_maps",
+    "raw_html_file": "https://serpapi.com/searches/68b2f3fcc4d1a9e20/68b2f0aa.html",
+    "total_time_taken": 0.96
+  },
+  "search_parameters": {
+    "engine": "google_maps",
+    "q": "Northwind Logistics Austin, Texas, United States",
+    "type": "search",
+    "ll": "@30.2672,-97.7431,13z"
+  },
+  "place_results": {
+    "title": "Northwind Logistics",
+    "place_id": "ChIJN1t_tDeuEmsRUsoyG83frY4",
+    "data_id": "0x8644b5a2c1e7a8f9:0x3d4f2b91c77e1a02",
+    "data_cid": "4417756938765434882",
+    "provider_id": "/g/11c5q9k7x2",
+    "reviews": 38,
+    "rating": 2.9,
+    "unclaimed_listing": true,
+    "type": [
+      "Logistics service",
+      "Freight forwarding service"
+    ],
+    "address": "4412 Springdale Rd Suite B, Austin, TX 78723, United States",
+    "open_state": "Closed - Opens 8 AM Mon",
+    "phone": "+1 512-555-0142",
+    "website": "http://northwindlogistics.com/",
+    "link": "https://www.google.com/maps/place/Northwind+Logistics/@30.3122,-97.6741,17z/data=!3m1!4b1",
+    "gps_coordinates": {
+      "latitude": 30.3122,
+      "longitude": -97.6741
+    },
+    "operating_hours": {
+      "monday": "8 AM-5 PM",
+      "tuesday": "8 AM-5 PM",
+      "wednesday": "8 AM-5 PM",
+      "thursday": "8 AM-5 PM",
+      "friday": "8 AM-4 PM",
+      "saturday": "Closed",
+      "sunday": "Closed"
+    },
+    "service_options": {
+      "onsite_services": true,
+      "delivery": true,
+      "in_store_shopping": false
+    }
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "search_metadata": {
+    "id": "68b2f3ffc4d1a9e23",
+    "status": "Success",
+    "json_endpoint": "https://serpapi.com/searches/68b2f3ffc4d1a9e23/68b2f0aa/68b2f3ffc4d1a9e23.json",
+    "created_at": "2026-09-02 11:04:18 UTC",
+    "processed_at": "2026-09-02 11:04:18 UTC",
+    "google_maps_reviews_url": "https://serpapi.com/search?engine=google_maps_reviews",
+    "raw_html_file": "https://serpapi.com/searches/68b2f3ffc4d1a9e23/68b2f0aa.html",
+    "total_time_taken": 1.35
+  },
+  "search_parameters": {
+    "engine": "google_maps_reviews",
+    "data_id": "0x8644b5a2c1e7a8f9:0x3d4f2b91c77e1a02",
+    "sort_by": "newestFirst",
+    "num": "20"
+  },
+  "place_info": {
+    "title": "Northwind Logistics",
+    "address": "4412 Springdale Rd Suite B, Austin, TX 78723",
+    "rating": 2.9,
+    "reviews": 38
+  },
+  "topics": [
+    {
+      "keyword": "deposit",
+      "mentions": 11
+    },
+    {
+      "keyword": "no response",
+      "mentions": 9
+    }
+  ],
+  "reviews": [
+    {
+      "link": "https://www.google.com/maps/reviews/data=!4m8!14m7!1m6!2m5!1sChZDSUhNMG9nS0VJQ0FnSUR",
+      "rating": 1,
+      "date": "2 days ago",
+      "iso_date": "2026-08-31T14:22:11Z",
+      "snippet": "Paid a deposit in June for a bonded warehouse slot. Freight was never collected and nobody answers the phone.",
+      "user": {
+        "name": "D. Okafor",
+        "link": "https://www.google.com/maps/contrib/101582993847261048372",
+        "reviews": 4,
+        "photos": 1
+      }
+    },
+    {
+      "link": "https://www.google.com/maps/reviews/data=!4m8!14m7!1m6!2m5!1sChZDSUhNMG9nS0VJQ0FnSUR2",
+      "rating": 1,
+      "date": "4 days ago",
+      "iso_date": "2026-08-29T09:41:02Z",
+      "snippet": "Two loads lost, no BOL, no claims process. Avoid.",
+      "user": {
+        "name": "Marisol V.",
+        "link": "https://www.google.com/maps/contrib/117739284012938471",
+        "reviews": 22
+      }
+    },
+    {
+      "link": "https://www.google.com/maps/reviews/data=!4m8!14m7!1m6!2m5!1sChZDSUhNMG9nS0VJQ0FnSUR3",
+      "rating": 2,
+      "date": "a week ago",
+      "iso_date": "2026-08-25T17:03:55Z",
+      "snippet": "Rates were fine until they weren't. Invoicing changed mid-contract.",
+      "user": {
+        "name": "Tobias Lenk",
+        "link": "https://www.google.com/maps/contrib/104883720019283746",
+        "reviews": 8
+      }
+    },
+    {
+      "link": "https://www.google.com/maps/reviews/data=!4m8!14m7!1m6!2m5!1sChZDSUhNMG9nS0VJQ0FnSUR4",
+      "rating": 1,
+      "date": "a week ago",
+      "iso_date": "2026-08-24T11:15:40Z",
+      "snippet": "Office is closed during posted hours. Emails bounce.",
+      "user": {
+        "name": "R. Halloran",
+        "link": "https://www.google.com/maps/contrib/113028473610293847"
+      }
+    },
+    {
+      "link": "https://www.google.com/maps/reviews/data=!4m8!14m7!1m6!2m5!1sChZDSUhNMG9nS0VJQ0FnSUR5",
+      "rating": 5,
+      "date": "3 years ago",
+      "iso_date": "2023-05-18T20:00:00Z",
+      "snippet": "Great team back when Dale ran the Laredo desk.",
+      "user": {
+        "name": "Ken A.",
+        "link": "https://www.google.com/maps/contrib/100192837465019283"
+      }
+    }
+  ],
+  "serpapi_pagination": {
+    "next_page_token": "CAESY0NBRVFDaHBGQ2tKWGFYUm9JSFJvWlNCa1lYUmxJSE4wY21sdVp3",
+    "next": "https://serpapi.com/search.json?engine=google_maps_reviews&next_page_token=CAESY0NB"
+  }
+}

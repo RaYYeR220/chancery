@@ -1,0 +1,24 @@
+{
+  "results": [
+    {
+      "domainName": "chancery-writ.com",
+      "sld": "chancery-writ",
+      "tld": "com",
+      "purchasable": true,
+      "premium": false,
+      "purchasePrice": 10.99,
+      "renewalPrice": 12.99,
+      "purchaseType": "registration"
+    },
+    {
+      "domainName": "chancery-writ.dev",
+      "sld": "chancery-writ",
+      "tld": "dev",
+      "purchasable": true,
+      "premium": false,
+      "purchasePrice": 14.99,
+      "renewalPrice": 14.99,
+      "purchaseType": "registration"
+    }
+  ]
+}

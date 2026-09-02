@@ -1,0 +1,51 @@
+{
+  "search_metadata": {
+    "id": "68b2f3efc4d1a9e7",
+    "status": "Success",
+    "json_endpoint": "https://serpapi.com/searches/68b2f3efc4d1a9e7/68b2f0aa/68b2f3efc4d1a9e7.json",
+    "created_at": "2026-09-02 11:04:18 UTC",
+    "processed_at": "2026-09-02 11:04:18 UTC",
+    "google_light_url": "https://serpapi.com/search?engine=google_light",
+    "raw_html_file": "https://serpapi.com/searches/68b2f3efc4d1a9e7/68b2f0aa.html",
+    "total_time_taken": 1.61
+  },
+  "search_parameters": {
+    "engine": "google_light",
+    "q": "\"Northwind Logistics\""
+  },
+  "search_information": {
+    "query_displayed": "\"Northwind Logistics\"",
+    "total_results": 96400,
+    "organic_results_state": "Results for exact spelling"
+  },
+  "organic_results": [
+    {
+      "position": 1,
+      "title": "Northwind Logistics - Freight brokerage and warehousing since 1998",
+      "link": "https://northwindlogistics.com/",
+      "displayed_link": "https://northwindlogistics.com",
+      "snippet": "Northwind Logistics moves 40,000 loads a year across North America. FTL, LTL, drayage and bonded warehousing."
+    },
+    {
+      "position": 2,
+      "title": "Northwind Logistics Group, Inc. | LinkedIn",
+      "link": "https://www.linkedin.com/company/northwind-logistics-group",
+      "displayed_link": "https://www.linkedin.com › company",
+      "snippet": "Northwind Logistics Group, Inc. | 3,104 followers on LinkedIn."
+    },
+    {
+      "position": 3,
+      "title": "Careers at Northwind Logistics",
+      "link": "https://careers.northwindlogistics.com/openings",
+      "displayed_link": "https://careers.northwindlogistics.com",
+      "snippet": "Open roles in Austin, Laredo and Memphis."
+    },
+    {
+      "position": 4,
+      "title": "How the northwind flows: a shipper's guide to seasonal freight",
+      "link": "https://www.freightwaves.com/news/northwind-seasonal-freight",
+      "displayed_link": "https://www.freightwaves.com › news",
+      "snippet": "Seasonal capacity swings and the northwind effect on spot rates."
+    }
+  ]
+}

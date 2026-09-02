@@ -1,0 +1,250 @@
+{
+  "output": {
+    "data": {
+      "principal": {
+        "legalName": "Ada Okonkwo",
+        "email": "ada@northgate.example"
+      },
+      "agent": {
+        "label": "Northgate Ops Agent",
+        "domain": "ops.northgate.example",
+        "publicKey": "k9XyQ2r7bT4mLp0Zc8VhNfEwJd1sUaGx3RoY6BtKlMc"
+      },
+      "grants": [
+        { "ref": "3(a)", "actKind": "domain.register" },
+        { "ref": "3(b)", "actKind": "dns.write" }
+      ],
+      "limits": [
+        { "grantRef": "3(a)", "type": "count", "max": 5, "window": "month" },
+        { "grantRef": "3(a)", "type": "allowlist", "field": "tld", "values": "com,dev,io" },
+        {
+          "grantRef": "3(b)",
+          "type": "amount",
+          "maxMinorUnits": 50000,
+          "currency": "USD",
+          "window": "month"
+        }
+      ],
+      "conditions": [
+        { "grantRef": "3(a)", "type": "diligence", "check": "trademark_clear" }
+      ],
+      "effectiveFrom": "2026-01-01",
+      "expiresAt": "2026-12-31",
+      "jurisdiction": "England and Wales"
+    },
+    "metadata": {
+      "principal": {
+        "legalName": {
+          "match": "id_match",
+          "confidence": 0.94,
+          "bbox": [72, 148, 180, 14],
+          "pageIndex": 0,
+          "pageNumber": 1,
+          "source_bboxes": [
+            {
+              "bbox": [72, 148, 180, 14],
+              "block_id": "b_principal_1",
+              "pageIndex": 0,
+              "pageNumber": 1
+            }
+          ]
+        }
+      },
+      "agent": {
+        "label": {
+          "match": "id_match",
+          "confidence": 0.9,
+          "bbox": [72, 176, 210, 14],
+          "pageNumber": 1
+        },
+        "domain": {
+          "match": "id_match",
+          "confidence": 0.97,
+          "bbox": [72, 194, 190, 14],
+          "pageNumber": 1,
+          "source_bboxes": [{ "bbox": [72, 194, 190, 14], "block_id": "b_agent_2", "pageNumber": 1 }]
+        },
+        "publicKey": {
+          "match": "id_match_multiblock",
+          "confidence": 0.81,
+          "bbox": [72, 212, 400, 28],
+          "pageNumber": 1,
+          "source_bboxes": [
+            { "bbox": [72, 212, 400, 14], "block_id": "b_key_a", "pageNumber": 1 },
+            { "bbox": [72, 226, 400, 14], "block_id": "b_key_b", "pageNumber": 1 }
+          ]
+        }
+      },
+      "grants": [
+        {
+          "ref": {
+            "match": "id_match",
+            "confidence": 0.99,
+            "bbox": [72, 280, 30, 14],
+            "pageNumber": 1
+          },
+          "actKind": {
+            "match": "id_match",
+            "confidence": 0.88,
+            "bbox": [110, 280, 160, 14],
+            "pageNumber": 1,
+            "source_bboxes": [
+              { "bbox": [110, 280, 160, 14], "block_id": "b_grant_3a", "pageNumber": 1 }
+            ]
+          }
+        },
+        {
+          "ref": {
+            "match": "id_match",
+            "confidence": 0.98,
+            "bbox": [72, 366, 30, 14],
+            "pageNumber": 1
+          },
+          "actKind": {
+            "match": "fuzzy_match",
+            "confidence": 0.72,
+            "bbox": [110, 366, 140, 14],
+            "pageNumber": 1,
+            "confidenceComponents": {
+              "probabilityScore": 0.72,
+              "marginScore": 0.11,
+              "groundingScore": 0.4,
+              "source": "logprobs+margin"
+            }
+          }
+        }
+      ],
+      "limits": [
+        {
+          "grantRef": {
+            "match": "id_match",
+            "confidence": 0.96,
+            "bbox": [72, 298, 30, 14],
+            "pageNumber": 1
+          },
+          "type": {
+            "match": "id_match",
+            "confidence": 0.86,
+            "bbox": [110, 298, 60, 14],
+            "pageNumber": 1
+          },
+          "max": {
+            "match": "id_match",
+            "bbox": [176, 298, 20, 14],
+            "pageNumber": 1,
+            "source_bboxes": [
+              { "bbox": [176, 298, 20, 14], "block_id": "b_limit_count", "pageNumber": 1 }
+            ]
+          },
+          "window": {
+            "match": "id_match",
+            "confidence": 0.92,
+            "bbox": [202, 298, 50, 14],
+            "pageNumber": 1
+          }
+        },
+        {
+          "grantRef": {
+            "match": "id_match",
+            "confidence": 0.95,
+            "bbox": [72, 316, 30, 14],
+            "pageNumber": 1
+          },
+          "type": {
+            "match": "id_match",
+            "confidence": 0.84,
+            "bbox": [110, 316, 70, 14],
+            "pageNumber": 1
+          },
+          "field": {
+            "match": "id_match",
+            "confidence": 0.79,
+            "bbox": [186, 316, 30, 14],
+            "pageNumber": 1
+          },
+          "values": {
+            "match": "id_match",
+            "confidence": 0.31,
+            "bbox": [222, 316, 120, 14],
+            "pageNumber": 1,
+            "source_bboxes": [
+              { "bbox": [222, 316, 120, 14], "block_id": "b_tld_list", "pageNumber": 1 }
+            ]
+          }
+        },
+        {
+          "grantRef": {
+            "match": "id_match",
+            "confidence": 0.94,
+            "bbox": [72, 384, 30, 14],
+            "pageNumber": 1
+          },
+          "type": {
+            "match": "id_match",
+            "confidence": 0.83,
+            "bbox": [110, 384, 60, 14],
+            "pageNumber": 1
+          },
+          "maxMinorUnits": { "match": "not_found" },
+          "currency": {
+            "match": "id_match",
+            "confidence": 0.91,
+            "bbox": [246, 384, 40, 14],
+            "pageNumber": 1
+          },
+          "window": {
+            "match": "id_match",
+            "confidence": 0.9,
+            "bbox": [292, 384, 50, 14],
+            "pageNumber": 1
+          }
+        }
+      ],
+      "conditions": [
+        {
+          "grantRef": {
+            "match": "id_match",
+            "confidence": 0.93,
+            "bbox": [72, 334, 30, 14],
+            "pageNumber": 1
+          },
+          "type": {
+            "match": "id_match",
+            "confidence": 0.9,
+            "bbox": [110, 334, 70, 14],
+            "pageNumber": 1
+          },
+          "check": {
+            "match": "id_match",
+            "confidence": 0.87,
+            "bbox": [186, 334, 120, 14],
+            "pageNumber": 1
+          }
+        }
+      ],
+      "effectiveFrom": {
+        "match": "id_match_partial",
+        "confidence": 0.76,
+        "bbox": [72, 420, 90, 14],
+        "pageNumber": 1
+      },
+      "expiresAt": {
+        "match": "id_match",
+        "confidence": 0.93,
+        "bbox": [72, 438, 90, 14],
+        "pageNumber": 1
+      },
+      "jurisdiction": {
+        "match": "id_match",
+        "confidence": 0.95,
+        "bbox": [72, 456, 150, 14],
+        "pageNumber": 1
+      }
+    },
+    "pages": [{ "pageIndex": 0, "pageNumber": 1, "width": 612, "height": 792 }]
+  },
+  "usage": {
+    "pages": 1,
+    "data_extraction_credits": { "used": 15, "remainingCredits": 35 }
+  }
+}
