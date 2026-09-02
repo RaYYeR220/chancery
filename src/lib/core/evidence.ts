@@ -92,11 +92,24 @@ export interface EvidenceBundle {
 }
 
 export function bundleDigest(bundle: EvidenceBundle): string {
-  // The decision is excluded: the digest identifies the *inputs*, so a replay
-  // that disagrees is a disagreement about the same evidence rather than about
-  // two different bundles.
-  const { decision: _decision, ...inputs } = bundle;
-  return digest(inputs);
+  // The decision is excluded, and the inputs are listed rather than spread, so
+  // that adding a field to the bundle is a deliberate decision about whether it
+  // belongs in the digest. The digest identifies the *inputs*, which is what
+  // lets a replay that disagrees be a disagreement about the same evidence
+  // rather than about two different bundles.
+  return digest({
+    version: bundle.version,
+    evaluatedAt: bundle.evaluatedAt,
+    resolution: bundle.resolution,
+    lookup: bundle.lookup,
+    document: bundle.document,
+    extraction: bundle.extraction,
+    policy: bundle.policy,
+    request: bundle.request,
+    history: bundle.history,
+    diligence: bundle.diligence,
+    options: bundle.options,
+  });
 }
 
 export interface BundleAssembly {
