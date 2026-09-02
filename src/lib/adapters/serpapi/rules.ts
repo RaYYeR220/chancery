@@ -180,7 +180,7 @@ export function isRegistryHost(host: string | null): boolean {
 
 export interface TrademarkHit {
   record: SerpApiJson;
-  engine: EngineName;
+  /** A dead mark is a hit but not a collision, so status travels with it. */
   live: boolean;
 }
 
@@ -192,7 +192,7 @@ export function findTrademarkHits(json: SerpApiJson, subject: DiligenceSubject):
     if (!mentionsSubject(text, subject)) continue;
     // A dead mark is not a collision — it is the opposite, evidence the name
     // was released — so status is read rather than assumed from the hit.
-    hits.push({ record, engine: "google", live: isLiveMark(text) });
+    hits.push({ record, live: isLiveMark(text) });
   }
   return hits;
 }
