@@ -39,3 +39,29 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# --- working artifacts (never publish) ---
+BRIEF.md
+ALTERNATIVES.md
+notes/
+*-internal/
+*-backup*
+*.bundle
+.remember/
+MEMORY.md
+superpowers/
+docs/superpowers/
+.agents/
+.claude/
+plans/
+specs/
+submission*.md
+scratch*/
+# UI exploration — only the chosen final UI ships
+ui-prototypes/
+mockups/
+design-ref/
+variants/
+# media working files
+video/
+voiceover/
