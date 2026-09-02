@@ -152,3 +152,26 @@ describe("selecting the record to act on", () => {
     expect(selectWritRecord(["v=WRIT1; k=; h=; u=; exp="]).outcome).toBe("absent");
   });
 });
+
+describe("byte-accurate handling", () => {
+  it("counts the 255-byte limit in bytes, not characters", () => {
+    // A 200-character string of 3-byte characters is 600 bytes, which must be
+    // three chunks, not one.
+    const chunks = chunkTxtValue("あ".repeat(200));
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const chunk of chunks) {
+      expect(new TextEncoder().encode(chunk).byteLength).toBeLessThanOrEqual(255);
+    }
+  });
+
+  it("never splits a multi-byte character across two chunks", () => {
+    const value = "é".repeat(300);
+    expect(joinTxtChunks(chunkTxtValue(value))).toBe(value);
+  });
+
+  it("refuses to serialise a url containing a semicolon rather than corrupting the record", () => {
+    expect(() =>
+      serializeWritRecord({ ...base, url: "https://chancery.example/w?a=1;b=2" }),
+    ).toThrow(WritRecordError);
+  });
+});

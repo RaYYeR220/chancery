@@ -79,6 +79,17 @@ function stripTrailingDot(name: string): string {
 }
 
 export function serializeWritRecord(record: WritRecord): string {
+  // `;` separates tags, and the grammar has no escape for it. A value carrying
+  // one would parse back as two tags and quietly change meaning, so it is
+  // rejected here rather than round-tripping into something else. In practice
+  // only `u=` can contain one, and a URL that does can simply be reissued.
+  if (record.url.includes(";")) {
+    throw new WritRecordError(
+      "u= cannot contain a semicolon; it would split the record into two tags",
+      "BAD_VALUE",
+    );
+  }
+
   const tags: string[] = [
     `v=${record.version}`,
     `st=${record.status}`,
@@ -100,12 +111,31 @@ export function joinTxtChunks(chunks: readonly string[]): string {
   return chunks.map((chunk) => chunk.replace(/^"|"$/g, "")).join("");
 }
 
+/**
+ * The 255 in RFC 1035 counts BYTES, not characters. Slicing a JavaScript string
+ * by index would let a single non-ASCII character push a chunk over the limit,
+ * and would also split a multi-byte character across two chunks. Neither is
+ * reachable with base64url values and an ASCII URL, but the record format does
+ * not forbid an internationalised URL, so this counts properly.
+ */
 export function chunkTxtValue(value: string): string[] {
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+  const bytes = encoder.encode(value);
+  if (bytes.length === 0) return [""];
+
   const chunks: string[] = [];
-  for (let i = 0; i < value.length; i += TXT_CHUNK_LIMIT) {
-    chunks.push(value.slice(i, i + TXT_CHUNK_LIMIT));
+  let start = 0;
+  while (start < bytes.length) {
+    let end = Math.min(start + TXT_CHUNK_LIMIT, bytes.length);
+    // Walk back off a continuation byte so a character is never cut in half.
+    while (end > start && end < bytes.length && (bytes[end] & 0b1100_0000) === 0b1000_0000) {
+      end -= 1;
+    }
+    chunks.push(decoder.decode(bytes.subarray(start, end)));
+    start = end;
   }
-  return chunks.length > 0 ? chunks : [""];
+  return chunks;
 }
 
 export function parseWritRecord(raw: string): WritRecord {
