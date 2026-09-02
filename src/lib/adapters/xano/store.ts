@@ -61,8 +61,19 @@ import {
 } from "./wire";
 
 export interface XanoWritStoreOptions {
-  /** API group base, e.g. `https://x8ki-letl-twmt.n7.xano.io/api:chancery`. */
+  /** The `chancery` API group, e.g. `https://x8ki-letl-twmt.n7.xano.io/api:chancery`. */
   baseUrl: string;
+  /**
+   * The `auth` group. Signup and login live in a group of their own so that the
+   * group-level authentication requirement on `chancery` never has to be punched
+   * a hole in — an unauthenticated endpoint sitting inside an authenticated
+   * group is precisely the mistake Xano's own guidance names. Xano gives each
+   * group its own base, hence the second URL. Defaults to `baseUrl`, which is
+   * what a single-group deployment (and the test double) uses.
+   */
+  authBaseUrl?: string;
+  /** The `public` group, likewise. Defaults to `baseUrl`. */
+  publicBaseUrl?: string;
   /** JWT from `auth/login`. Optional so the public endpoints work unauthenticated. */
   token?: string;
   fetchImpl?: FetchLike;
@@ -75,11 +86,14 @@ export interface CallOptions {
   signal?: AbortSignal;
 }
 
+type ApiGroup = "chancery" | "auth" | "public";
+
 interface RequestOptions extends CallOptions {
   query?: Record<string, string | number | undefined>;
   body?: unknown;
   /** Public endpoints deliberately send no Authorization header at all. */
   anonymous?: boolean;
+  group?: ApiGroup;
 }
 
 const PARSE_FAILED = Symbol("xano.parseFailed");
@@ -89,6 +103,8 @@ const IMMUTABLE_WRIT_FIELDS: readonly (keyof StoredWrit)[] = ["id", "spec"];
 
 export class XanoWritStore implements WritStore {
   readonly baseUrl: string;
+  readonly authBaseUrl: string;
+  readonly publicBaseUrl: string;
 
   private readonly fetchImpl: FetchLike;
   private readonly timeoutMs: number;
@@ -104,7 +120,9 @@ export class XanoWritStore implements WritStore {
       throw new XanoError("no fetch implementation available; pass fetchImpl", "INVALID_ARGUMENT");
     }
 
-    this.baseUrl = options.baseUrl.replace(/\/+$/, "");
+    this.baseUrl = trimSlashes(options.baseUrl);
+    this.authBaseUrl = trimSlashes(options.authBaseUrl ?? options.baseUrl);
+    this.publicBaseUrl = trimSlashes(options.publicBaseUrl ?? options.baseUrl);
     this.fetchImpl = fetchImpl as FetchLike;
     this.timeoutMs = options.timeoutMs ?? 15_000;
     this.now = options.now ?? Date.now;
@@ -127,6 +145,7 @@ export class XanoWritStore implements WritStore {
   ): Promise<{ token: string; principal: WirePrincipal }> {
     const body = await this.request<WireAuth>("POST", "/auth/signup", {
       ...options,
+      group: "auth",
       anonymous: true,
       body: {
         legal_name: input.legalName,
@@ -144,6 +163,7 @@ export class XanoWritStore implements WritStore {
   ): Promise<{ token: string; principal: WirePrincipal }> {
     const body = await this.request<WireAuth>("POST", "/auth/login", {
       ...options,
+      group: "auth",
       anonymous: true,
       body: { email: input.email, password: input.password },
     });
@@ -151,8 +171,9 @@ export class XanoWritStore implements WritStore {
     return { token: body.authToken, principal: body.principal };
   }
 
+  /** In the authenticated group, not the auth group: it needs a token to answer. */
   me(options: CallOptions = {}): Promise<WirePrincipal> {
-    return this.request<WirePrincipal>("GET", "/auth/me", options);
+    return this.request<WirePrincipal>("GET", "/me", options);
   }
 
   /* ------------------------------------------------------------------- writs */
@@ -311,6 +332,7 @@ export class XanoWritStore implements WritStore {
   verify(agentDomain: string, options: CallOptions = {}): Promise<WireVerification> {
     return this.request<WireVerification>("GET", "/verify", {
       ...options,
+      group: "public",
       anonymous: true,
       query: { domain: agentDomain },
     });
@@ -327,6 +349,7 @@ export class XanoWritStore implements WritStore {
   ): Promise<{ sequence: number; previous_hash: string; hash: string; kind: string; at: string }[]> {
     return this.request("GET", "/ledger/spine", {
       ...options,
+      group: "public",
       anonymous: true,
       query: { from: range.from, to: range.to },
     });
@@ -334,14 +357,20 @@ export class XanoWritStore implements WritStore {
 
   /* -------------------------------------------------------------- plumbing */
 
-  private buildUrl(path: string, query?: RequestOptions["query"]): string {
+  private baseFor(group: ApiGroup): string {
+    if (group === "auth") return this.authBaseUrl;
+    if (group === "public") return this.publicBaseUrl;
+    return this.baseUrl;
+  }
+
+  private buildUrl(path: string, options: RequestOptions): string {
     const search = new URLSearchParams();
-    for (const [key, value] of Object.entries(query ?? {})) {
+    for (const [key, value] of Object.entries(options.query ?? {})) {
       if (value === undefined) continue;
       search.set(key, String(value));
     }
     const qs = search.toString();
-    return `${this.baseUrl}${path}${qs.length > 0 ? `?${qs}` : ""}`;
+    return `${this.baseFor(options.group ?? "chancery")}${path}${qs.length > 0 ? `?${qs}` : ""}`;
   }
 
   private async request<T>(
@@ -349,7 +378,7 @@ export class XanoWritStore implements WritStore {
     path: string,
     options: RequestOptions = {},
   ): Promise<T> {
-    const url = this.buildUrl(path, options.query);
+    const url = this.buildUrl(path, options);
     const headers: Record<string, string> = { accept: "application/json" };
     if (options.body !== undefined) headers["content-type"] = "application/json";
     if (!options.anonymous) {
@@ -453,6 +482,10 @@ function writIdOf(payload: unknown): string | undefined {
 
 function segment(value: string): string {
   return encodeURIComponent(value);
+}
+
+function trimSlashes(value: string): string {
+  return value.replace(/\/+$/, "");
 }
 
 function safeJson(text: string): unknown | typeof PARSE_FAILED {

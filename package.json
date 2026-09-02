@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "verify": "tsx src/cli/verify.ts",
     "bench": "tsx src/cli/bench.ts",
-    "demo": "tsx src/cli/demo.ts"
+    "demo": "tsx src/cli/demo.ts",
+    "smoke": "tsx src/cli/smoke.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

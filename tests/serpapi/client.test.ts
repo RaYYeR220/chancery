@@ -157,7 +157,7 @@ describe("pagination traps", () => {
 
   it("allows num only where it is documented, and enforces its maximum", () => {
     expect(() =>
-      assertSearchParams({ engine: "google_patents", q: "a", litigation: true, num: 50 }),
+      assertSearchParams({ engine: "google_patents", q: "a", litigation: "YES", num: 50 }),
     ).not.toThrow();
     expect(() =>
       assertSearchParams({ engine: "google_maps_reviews", data_id: undefined, num: 20 }),

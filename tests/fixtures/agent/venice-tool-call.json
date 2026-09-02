@@ -1,0 +1,36 @@
+{
+  "id": "chatcmpl-9f3b2c1d",
+  "object": "chat.completion",
+  "created": 1788436800,
+  "model": "gemini-3-8-flash",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_a1",
+            "type": "function",
+            "function": {
+              "name": "act.request",
+              "arguments": "{\"kind\":\"domain.register\",\"fields\":{\"tld\":\"com\",\"domainName\":\"northwindcoffee.com\"},\"amountMinorUnits\":1099,\"currency\":\"USD\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 812,
+    "completion_tokens": 47,
+    "total_tokens": 859
+  },
+  "cost": {
+    "usd": 0.00041325,
+    "vcu": 0.0031788,
+    "diem": 0
+  }
+}

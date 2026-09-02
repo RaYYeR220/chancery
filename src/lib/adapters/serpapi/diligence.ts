@@ -150,7 +150,7 @@ export function planProbes(check: DiligenceCheck, subject: DiligenceSubject): Se
     case "no_patent_litigation":
       return [
         // The one parameter that answers the question outright.
-        { engine: "google_patents", q: entityName(subject), litigation: true, num: 20 },
+        { engine: "google_patents", q: entityName(subject), litigation: "YES", num: 20 },
         { engine: "google_scholar_case_law", q: `${phrase(entityName(subject))} patent infringement` },
       ];
   }

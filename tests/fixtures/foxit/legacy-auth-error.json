@@ -1,0 +1,5 @@
+{
+  "result": "error",
+  "errorMessage": "Authentication failed. Please check your API credentials.",
+  "errorCode": "AUTH_001"
+}

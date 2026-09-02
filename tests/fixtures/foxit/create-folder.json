@@ -1,0 +1,11 @@
+{
+  "folderId": "folder_01HZWRIT0001",
+  "folderName": "Writ of authority for ops-agent",
+  "status": "OUT_FOR_SIGNATURE",
+  "embeddedSigningSessions": [
+    {
+      "emailId": "principal@example.com",
+      "embeddedSessionURL": "https://na1.foxitesign.foxit.com/esign/embedded/sign?token=eyJhbGciOi"
+    }
+  ]
+}

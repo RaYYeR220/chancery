@@ -111,12 +111,14 @@ export interface GooglePatentsParams extends CommonParams {
   engine: "google_patents";
   q: string;
   /**
-   * Restricts results to patents with recorded litigation. The exact accepted
-   * spelling is not confirmed against a live key, so it is serialised as the
-   * lowercase boolean SerpApi uses elsewhere; if it were ever ignored the
-   * check degrades to "patents naming this assignee", never to a false clear.
+   * Restricts results to patents with recorded litigation.
+   *
+   * Confirmed against a live key: the parameter takes the literal strings
+   * `YES` and `NO`, in capitals. A boolean, `1`, or a lowercase spelling is
+   * rejected outright with `Unsupported ... litigation parameter`, so the wrong
+   * value fails loudly rather than silently widening the search.
    */
-  litigation?: boolean;
+  litigation?: "YES" | "NO";
   num?: number;
   page?: number;
   sort?: "new" | "old";

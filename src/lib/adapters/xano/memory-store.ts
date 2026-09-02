@@ -115,8 +115,11 @@ export class MemoryWritStore implements WritStore {
     }
     // Revocation is terminal. Re-activating a revoked instrument by patch would
     // make the DNS tombstone and the registry disagree about live authority.
+    // Raised as FORBIDDEN rather than CONFLICT so that it is the same typed
+    // error the HTTP store raises: XanoScript's error types have no `conflict`,
+    // so the endpoint answers `accessdenied` and this has to match it.
     if (row.writ.status === "revoked" && patch.status !== undefined && patch.status !== "revoked") {
-      throw new XanoError(`writ ${id} is revoked; that is terminal`, "CONFLICT");
+      throw new XanoError(`writ ${id} is revoked; that is terminal`, "FORBIDDEN");
     }
 
     const updated: StoredWrit = { ...row.writ };

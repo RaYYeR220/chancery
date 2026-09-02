@@ -1,0 +1,12 @@
+data: {"id":"chatcmpl-stream-1","model":"gemini-3-8-flash","choices":[{"index":0,"delta":{"role":"assistant","content":"Checking "}}]}
+
+data: {"id":"chatcmpl-stream-1","choices":[{"index":0,"delta":{"content":"the writ first."}}]}
+
+data: {"id":"chatcmpl-stream-1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_s1","type":"function","function":{"name":"act.request","arguments":"{\"kind\":\"domain."}}]}}]}
+
+data: {"id":"chatcmpl-stream-1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"register\",\"fields\":{\"tld\":\"com\"}}"}}]}}]}
+
+data: {"id":"chatcmpl-stream-1","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}],"usage":{"total_tokens":901,"cost":{"usd":0.00052}}}
+
+data: [DONE]
+

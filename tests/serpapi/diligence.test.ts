@@ -75,7 +75,10 @@ describe("probe planning", () => {
     const patents = planProbes("no_patent_litigation", NORTHWIND).find(
       (params) => params.engine === "google_patents",
     );
-    expect(bagOf(patents as SerpApiParams).litigation).toBe(true);
+    // Confirmed against a live key: SerpApi takes the literal "YES"/"NO" here
+    // and rejects a boolean outright, so the wrong spelling fails loudly rather
+    // than silently widening the search to every patent naming the assignee.
+    expect(bagOf(patents as SerpApiParams).litigation).toBe("YES");
   });
 
   it("sorts reviews newest first, so a recent collapse is not hidden by an average", () => {

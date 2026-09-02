@@ -1,0 +1,25 @@
+{
+  "id": "chatcmpl-7c4a0e55",
+  "object": "chat.completion",
+  "created": 1788436812,
+  "model": "qwen3-235b-a22b-thinking-2507",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Three domains are registered. The fourth was refused under clause 3(b)."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1204,
+    "completion_tokens": 88,
+    "total_tokens": 1292,
+    "cost": {
+      "usd": 0.0019364,
+      "vcu": 0.0148954
+    }
+  }
+}
