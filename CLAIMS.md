@@ -54,6 +54,8 @@ Every public statement we make about Chancery, tagged by what actually backs it.
 | Confidence is never presented as a probability or a percentage. | REPRODUCIBLE | A test asserts no rendered finding contains `%`. |
 | The Nutrient account and its free execution planner respond. | **VERIFIED-LIVE** | `pnpm smoke` reports the credit balance and runs `analyze_build`, which returns the execution plan a Build would follow and costs nothing. |
 | A writ is rendered to PDF/A and cryptographically signed by the live API. | **VERIFIED-LIVE** | `pnpm issue`. HTML to PDF/A through the Build API, then `/sign`; the signed bytes are hashed and that hash is what goes into DNS. |
+| **Doctavian generates the writ, with its branching and calculations exercised.** | **VERIFIED-LIVE** | `pnpm writ` runs all six calls against the live tenant and returns a two-page PDF. Eleven of sixteen output checks pass, including the ones that matter: `sum()` over four string-typed fields yields `2650.00` rather than a concatenation, the repeater produced one clause per granted act with nested sub-clauses, and the jurisdiction branch resolved correctly. |
+| Every clause in the generated document is visible. | **NOT YET** | Five checks fail from one cause: `<mdoc:text>` elements render nothing, so the conditional clauses are correctly *decided* and not *printed*. The branching logic is right; its output is missing. |
 | Extraction against the live API produces these citations for our writ. | *pending* | Blocked on nothing but time; the account was topped up to 500,000 credits. |
 
 ## Diligence
