@@ -77,9 +77,21 @@ The **negative result** in [`CLAIMS.md`](./CLAIMS.md). We claimed the signing bo
 
 ## Links
 
-- Live demo: *(see the submission page)*
-- Public verifier: *(see the submission page)*
-- Video: *(see the submission page)*
+- **Live demo** — https://chancery.live
+- **Public verifier** — https://chancery.live/verify
+- **Public ledger** — https://x8ki-letl-twmt.n7.xano.io/api:chancery-verify/ledger/spine
+- Video — *(see the submission page)*
+
+## And a live writ you can check without us
+
+```bash
+dig +short TXT _writ.chancery.live
+curl -s https://chancery.live/w/1.pdf | openssl dgst -sha256 -binary | basenc --base64url | tr -d '='
+```
+
+Both give `DJFCbC3nwknF6XUaOH9xIRBRWCSd6-UL4GiXzdiQjAs`. The document was rendered from the same `Writ` object the engine enforces, converted to PDF/A, cryptographically signed, and its hash written into DNS through the registrar's API.
+
+The zone is **not** DNSSEC-signed — name.com's default nameservers do not support it — so `pnpm verify chancery.live` reports the authority as unverified and denies. That is the gate working, not a bug, and it is recorded as `NOT TRUE` in `CLAIMS.md`.
 
 ## Full test suite
 
