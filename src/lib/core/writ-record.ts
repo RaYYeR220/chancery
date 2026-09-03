@@ -188,7 +188,13 @@ export function parseWritRecord(raw: string): WritRecord {
     throw new WritRecordError("s= is not base64url", "BAD_VALUE");
   }
 
-  return { version, status, publicKey, documentHash, url, expiresAt, signature };
+  // The key is omitted rather than set to `undefined` when the tag is absent.
+  // The record travels into the evidence bundle, which is hashed canonically,
+  // and canonicalisation refuses an undefined property rather than silently
+  // dropping it — so setting it here made every unsigned record throw at the
+  // moment of decision instead of being decided.
+  const record: WritRecord = { version, status, publicKey, documentHash, url, expiresAt };
+  return signature === undefined ? record : { ...record, signature };
 }
 
 function parseStatus(raw: string | undefined): WritStatus {

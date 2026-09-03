@@ -545,8 +545,8 @@ export function statusReport(config: ChanceryConfig): StatusReport {
 
 function headline(total: number, live: number, misconfigured: number): string {
   if (misconfigured > 0) {
-    const seams = misconfigured === 1 ? "seam is" : "seams are";
-    return `${misconfigured} of ${total} ${seams} partly configured and not live`;
+    const verb = misconfigured === 1 ? "is" : "are";
+    return `${misconfigured} of ${total} seams ${verb} partly configured and not live`;
   }
   if (live === 0) return "Stand-in throughout — no credentials configured";
   if (live === total) return "Live throughout — every seam is talking to its vendor";

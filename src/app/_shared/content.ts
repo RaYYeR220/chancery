@@ -371,9 +371,9 @@ export const ACT_PRESETS: ActPreset[] = [
   {
     id: "reg-trade-io",
     title: "Register northwindtrade.io",
-    detail: "$32.00, a suffix the schedule does not carry",
-    watch: "The name is well formed and the budget is untouched. The suffix alone stops it.",
-    request: registration("northwindtrade.io", "io", 3_200),
+    detail: "$19.00, a suffix the schedule does not carry — ask before the third registration",
+    watch: "The name is well formed and the budget has room. The suffix alone stops it.",
+    request: registration("northwindtrade.io", "io", 1_900),
   },
   {
     id: "reg-collision",

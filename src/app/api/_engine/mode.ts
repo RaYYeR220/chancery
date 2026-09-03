@@ -22,12 +22,22 @@ export function serpApiKey(): string | null {
   return typeof key === "string" && key.length > 0 ? key : null;
 }
 
+/**
+ * Live diligence is opt-in even with a key present, because a check that times
+ * out answers `unknown` and `unknown` denies. The walkthrough has to be
+ * reproducible; a live SERP's latency is not.
+ */
+export function liveDiligenceRequested(): boolean {
+  return process.env.CHANCERY_LIVE_DILIGENCE === "1";
+}
+
 export function modeReport(): ModeReport {
   const doctavian = present("DOCTAVIAN_BEARER", "DOCTAVIAN_DOCUMENTS_KEY");
   const foxit = present("FOXIT_ESIGN_CLIENT_ID", "FOXIT_ESIGN_CLIENT_SECRET");
   const nutrient = present("NUTRIENT_API_KEY");
   const namecom = present("NAMECOM_USERNAME", "NAMECOM_TOKEN");
-  const serpapi = serpApiKey() !== null;
+  const serpapiKey = serpApiKey() !== null;
+  const serpapi = serpapiKey && liveDiligenceRequested();
   const xano = present("XANO_BASE_URL", "XANO_TOKEN");
 
   const services: ServiceStatus[] = [
@@ -102,9 +112,11 @@ export function modeReport(): ModeReport {
       supply: serpapi ? "live" : "scripted",
       detail: serpapi
         ? "Trademark checks run against live search results, and a check that times out denies."
-        : "Trademark checks read a local register extract of three entries, quoted in full on every finding.",
-      requires: ["SERPAPI_KEY"],
-      credentialsPresent: serpapi,
+        : serpapiKey
+          ? "Credentials present, live checks not requested. Set CHANCERY_LIVE_DILIGENCE=1 to run them; until then a local register extract of three entries answers, quoted in full on every finding."
+          : "Trademark checks read a local register extract of three entries, quoted in full on every finding.",
+      requires: ["SERPAPI_KEY", "CHANCERY_LIVE_DILIGENCE=1"],
+      credentialsPresent: serpapiKey,
     },
     {
       key: "xano",
@@ -119,7 +131,7 @@ export function modeReport(): ModeReport {
     },
   ];
 
-  const scriptedThroughout = !doctavian && !foxit && !nutrient && !namecom && !serpapi && !xano;
+  const scriptedThroughout = !doctavian && !foxit && !nutrient && !namecom && !serpapiKey && !xano;
 
   return {
     scriptedThroughout,

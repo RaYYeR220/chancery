@@ -33,7 +33,7 @@ import {
   DemoZone,
 } from "./adapters";
 import { AGENT, DOCUMENT_BASE_URL, PRINCIPAL, presetById } from "@/app/_shared/content";
-import { serpApiKey } from "./mode";
+import { liveDiligenceRequested, serpApiKey } from "./mode";
 
 /** How long the demo instrument runs for. Long enough to be real, short enough to read. */
 const TERM_DAYS = 90;
@@ -80,7 +80,12 @@ export class DemoSession {
     this.registry = new DemoRegistry(this.zone);
     this.resolver = new DemoResolver(this.zone, clock);
 
-    const key = serpApiKey();
+    // Live search is opt-in even when a key is present. A SERP that times out
+    // answers `unknown`, `unknown` denies, and a walkthrough whose verdicts
+    // depend on someone else's latency is not a walkthrough. The mode board
+    // says which of the two answered, so this is a stated choice rather than a
+    // scripted answer wearing a live badge.
+    const key = liveDiligenceRequested() ? serpApiKey() : null;
     const diligence: DiligenceService =
       key === null ? new DemoDiligence() : new LiveDiligence(key);
     this.diligenceLabel = key === null ? "scripted" : "live";
@@ -95,6 +100,12 @@ export class DemoSession {
       store: this.store,
       clock,
       documentBaseUrl: DOCUMENT_BASE_URL,
+      // Passed explicitly rather than left off. `Chancery.evaluate` copies this
+      // straight into the bundle's `options`, and `canonicalize` refuses a
+      // property that is present and undefined — so omitting it makes every
+      // `putEvidence` throw. Strict is the right value here anyway: the demo
+      // zone is served in process and reports AD set.
+      allowUnauthenticatedDns: false,
     });
   }
 
@@ -261,7 +272,17 @@ class LiveDiligence implements DiligenceService {
 
 /* ------------------------------------------------------------ the registry */
 
-const sessions = new Map<string, DemoSession>();
+/**
+ * Held on `globalThis` rather than in a module binding. Next compiles each
+ * route handler into its own bundle, so a plain module-level Map gives
+ * `/api/act` and `/api/verify` two different registries and the verifier cannot
+ * see the zone the console just published into.
+ */
+const registry = globalThis as typeof globalThis & {
+  __chancerySessions?: Map<string, DemoSession>;
+};
+registry.__chancerySessions ??= new Map<string, DemoSession>();
+const sessions = registry.__chancerySessions;
 
 export function getSession(id: string | undefined): DemoSession | null {
   if (id === undefined) return null;

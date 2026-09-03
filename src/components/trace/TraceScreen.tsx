@@ -30,7 +30,7 @@ const FLAVOURS: { code: string; label: string; presetId: string; note: string }[
     code: "VALUE_NOT_ALLOWLISTED",
     label: "Outside the schedule",
     presetId: "reg-trade-io",
-    note: "Well-formed name, untouched budget, unlisted suffix.",
+    note: "Well-formed name, budget with room, unlisted suffix. Ask before the third registration, or the count answers first.",
   },
   {
     code: "DILIGENCE_FLAGGED",

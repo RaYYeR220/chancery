@@ -146,7 +146,7 @@ export function LineMap({ stations, runKey, stopIndex, outcome }: LineMapProps) 
     <div className="linemap">
       <svg
         className="linemap__svg"
-        viewBox="0 0 1010 152"
+        viewBox="0 0 1010 166"
         preserveAspectRatio="xMidYMid meet"
         aria-hidden="true"
         focusable="false"

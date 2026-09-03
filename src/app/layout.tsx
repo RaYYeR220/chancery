@@ -28,8 +28,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body className={`${publicSans.variable} ${archivoBlack.variable}`}>
+    // The font variables go on <html>, not <body>: the design tokens in
+    // globals.css are declared on :root and cannot read a variable defined one
+    // level below them.
+    <html lang="en" className={`${publicSans.variable} ${archivoBlack.variable}`}>
+      <body>
         <SessionProvider>
           <a className="skip" href="#main">
             Skip to the content

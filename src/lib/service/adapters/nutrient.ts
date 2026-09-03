@@ -306,9 +306,8 @@ function rewriter(
       const landed = rowPointers.get(`/${row[1]}/${row[2]}`);
       if (landed !== undefined) return landed.map((base) => `${base}${row[3] ?? ""}`);
       // The row never landed on a clause. If it named none, every clause has
-      // already been marked; if it named one that does not exist, there is
-      // nothing to deny. Either way there is no pointer to carry forward.
-      void grantCount;
+      // already been marked unreadable; if it named one that does not exist,
+      // there is no clause to deny. Either way there is nothing to carry over.
       return [];
     }
 

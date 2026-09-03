@@ -175,3 +175,20 @@ describe("byte-accurate handling", () => {
     ).toThrow(WritRecordError);
   });
 });
+
+describe("hashability", () => {
+  it("omits the signature key rather than setting it to undefined", () => {
+    // The record goes into the evidence bundle, which is hashed canonically, and
+    // canonicalisation refuses an undefined property instead of dropping it. A
+    // record with `signature: undefined` therefore made every decision about an
+    // unsigned writ throw rather than deny.
+    const record = parseWritRecord(VALID);
+    expect("signature" in record).toBe(false);
+  });
+
+  it("can be canonicalised, signed or not", async () => {
+    const { canonicalize } = await import("@/lib/core/canonical");
+    expect(() => canonicalize(parseWritRecord(VALID))).not.toThrow();
+    expect(() => canonicalize(parseWritRecord(`${VALID}; s=c2ln`))).not.toThrow();
+  });
+});

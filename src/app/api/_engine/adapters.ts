@@ -13,6 +13,7 @@
 import { documentHash } from "@/lib/core/bytes";
 import { digest } from "@/lib/core/canonical";
 import { selectWritRecord, writRecordName } from "@/lib/core/writ-record";
+import type { WritLookup } from "@/lib/core/writ-record";
 import type {
   DiligenceCheck,
   DiligenceFinding,
@@ -340,7 +341,7 @@ export class DemoRegistry implements DomainRegistry {
   private static readonly PRICES: Record<string, number> = {
     com: 1_099,
     net: 1_099,
-    io: 3_200,
+    io: 1_900,
     coffee: 3_800,
     ie: 2_400,
   };
@@ -421,8 +422,28 @@ export class DemoResolver implements WritResolver {
 
   async lookupWrit(agentDomain: string) {
     const resolution = await this.resolveTxt(writRecordName(agentDomain));
-    return { lookup: selectWritRecord(resolution.txtRecords), resolution };
+    return { lookup: withoutHoles(selectWritRecord(resolution.txtRecords)), resolution };
   }
+}
+
+/**
+ * Workaround, not a normalisation choice.
+ *
+ * `parseWritRecord` always writes a `signature` key and sets it to
+ * `tags.get("s")`, which is `undefined` for the ordinary record that carries no
+ * `s=` tag. `canonicalize` refuses an explicitly-undefined property, so every
+ * evidence bundle built from a DNS-parsed record throws inside
+ * `Chancery.evaluate` at `putEvidence`. Dropping the key here keeps the demo
+ * running; the fix belongs in `src/lib/core/writ-record.ts`, which this code
+ * may not edit.
+ */
+function withoutHoles(lookup: WritLookup): WritLookup {
+  if (lookup.outcome === "absent") return lookup;
+  const { signature, ...rest } = lookup.record;
+  return {
+    outcome: lookup.outcome,
+    record: signature === undefined ? rest : { ...rest, signature },
+  };
 }
 
 /* --------------------------------------------------------------- diligence */
