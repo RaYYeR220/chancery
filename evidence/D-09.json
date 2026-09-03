@@ -1,0 +1,255 @@
+{
+  "version": "chancery-evidence/1",
+  "evaluatedAt": "2026-09-03T12:00:00.000Z",
+  "resolution": {
+    "name": "_writ.ops.northwind.example",
+    "txtRecords": [
+      "v=WRIT1; st=active; k=MCowBQYDK2VwAyEAGb9ECWmEzf6FQbrBZ9w7lshQhqowtrbLDFw4rXAxZuE; h=n4bQgYhMfWWaL_qgxVrQFaO_TxsrC4Is0V1sFbDwCgg; u=https://chancery.example/writ/writ_northwind_001.pdf; exp=1796083200"
+    ],
+    "resolver": "https://cloudflare-dns.com/dns-query",
+    "authenticatedData": true,
+    "resolvedAt": "2026-09-03T12:00:00.000Z"
+  },
+  "lookup": {
+    "outcome": "active",
+    "record": {
+      "version": "WRIT1",
+      "status": "active",
+      "publicKey": "MCowBQYDK2VwAyEAGb9ECWmEzf6FQbrBZ9w7lshQhqowtrbLDFw4rXAxZuE",
+      "documentHash": "n4bQgYhMfWWaL_qgxVrQFaO_TxsrC4Is0V1sFbDwCgg",
+      "url": "https://chancery.example/writ/writ_northwind_001.pdf",
+      "expiresAt": 1796083200
+    }
+  },
+  "document": {
+    "url": "https://chancery.dev/w/writ_northwind_001",
+    "sha256": "n4bQgYhMfWWaL_qgxVrQFaO_TxsrC4Is0V1sFbDwCgg",
+    "byteLength": 48120,
+    "signature": {
+      "verified": true,
+      "method": "pades",
+      "profile": "b-lt"
+    }
+  },
+  "extraction": {
+    "method": "nutrient/understand",
+    "responseDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "groundingPolicy": {
+      "acceptedMatches": [
+        "id_match",
+        "id_match_multiblock",
+        "id_match_partial"
+      ],
+      "confidenceThreshold": null
+    }
+  },
+  "policy": {
+    "writ": {
+      "id": "writ_northwind_001",
+      "version": 1,
+      "principal": {
+        "id": "prin_northwind",
+        "legalName": "Northwind Coffee Ltd",
+        "email": "ops@northwind.example",
+        "entityVerified": true
+      },
+      "agent": {
+        "id": "agent_ops",
+        "label": "Northwind brand-launch agent",
+        "domain": "ops.northwind.example",
+        "publicKey": "MCowBQYDK2VwAyEAGb9ECWmEzf6FQbrBZ9w7lshQhqowtrbLDFw4rXAxZuE"
+      },
+      "grants": [
+        {
+          "ref": "3(b)",
+          "actKind": "domain.register",
+          "limits": [
+            {
+              "type": "count",
+              "max": 3,
+              "window": "total"
+            },
+            {
+              "type": "amount",
+              "maxMinorUnits": 5000,
+              "currency": "USD",
+              "window": "total"
+            },
+            {
+              "type": "allowlist",
+              "field": "tld",
+              "values": [
+                "com",
+                "net"
+              ]
+            },
+            {
+              "type": "pattern",
+              "field": "domainName",
+              "pattern": "^northwind"
+            }
+          ],
+          "conditions": [
+            {
+              "type": "diligence",
+              "check": "trademark_clear"
+            }
+          ]
+        },
+        {
+          "ref": "4(a)",
+          "actKind": "document.send_for_signature",
+          "limits": [
+            {
+              "type": "count",
+              "max": 5,
+              "window": "month"
+            }
+          ],
+          "conditions": [
+            {
+              "type": "jurisdiction",
+              "allowed": [
+                "IE"
+              ]
+            },
+            {
+              "type": "escalation",
+              "aboveMinorUnits": 1000000,
+              "currency": "EUR"
+            },
+            {
+              "type": "diligence",
+              "check": "counterparty_exists"
+            }
+          ]
+        }
+      ],
+      "effectiveFrom": "2026-09-01T00:00:00.000Z",
+      "expiresAt": "2026-12-01T00:00:00.000Z",
+      "jurisdiction": "IE"
+    },
+    "provenance": {
+      "/grants/0": {
+        "pointer": "/grants/0",
+        "match": "id_match",
+        "confidence": 0.93,
+        "pageNumber": 2,
+        "bbox": {
+          "x": 72,
+          "y": 316,
+          "width": 451,
+          "height": 58
+        },
+        "blockIds": [
+          "blk_c5"
+        ]
+      },
+      "/grants/1": {
+        "pointer": "/grants/1",
+        "match": "id_match",
+        "confidence": 0.93,
+        "pageNumber": 3,
+        "bbox": {
+          "x": 72,
+          "y": 316,
+          "width": 451,
+          "height": 58
+        },
+        "blockIds": [
+          "blk_e1"
+        ]
+      }
+    },
+    "ungrounded": [],
+    "documentHash": "n4bQgYhMfWWaL_qgxVrQFaO_TxsrC4Is0V1sFbDwCgg"
+  },
+  "request": {
+    "kind": "domain.register",
+    "fields": {
+      "tld": "com",
+      "domainName": "northwindbeans.com"
+    },
+    "amountMinorUnits": 1099,
+    "currency": "USD",
+    "requestedAt": "2026-09-03T12:00:00.000Z"
+  },
+  "history": [
+    {
+      "kind": "domain.register",
+      "grantRef": "3(b)",
+      "amountMinorUnits": 1099,
+      "currency": "USD",
+      "executedAt": "2026-09-03T12:00:00.000Z"
+    },
+    {
+      "kind": "domain.register",
+      "grantRef": "3(b)",
+      "amountMinorUnits": 1099,
+      "currency": "USD",
+      "executedAt": "2026-09-03T12:00:00.000Z"
+    }
+  ],
+  "diligence": [
+    {
+      "check": "trademark_clear",
+      "verdict": "clear",
+      "summary": "Nothing found that would block this act.",
+      "citations": [
+        {
+          "title": "Search results",
+          "url": "https://example.test/q",
+          "engine": "google"
+        }
+      ]
+    }
+  ],
+  "options": {},
+  "decision": {
+    "outcome": "allow",
+    "reasons": [
+      {
+        "code": "GRANTED",
+        "message": "Clause 3(b) of the signed writ permits domain.register.",
+        "clauseRef": "3(b)",
+        "pageNumber": 2,
+        "bbox": {
+          "x": 72,
+          "y": 316,
+          "width": 451,
+          "height": 58
+        }
+      }
+    ],
+    "writId": "writ_northwind_001",
+    "documentHash": "n4bQgYhMfWWaL_qgxVrQFaO_TxsrC4Is0V1sFbDwCgg",
+    "evaluatedAt": "2026-09-03T12:00:00.000Z",
+    "evidence": {
+      "actRequest": {
+        "kind": "domain.register",
+        "fields": {
+          "tld": "com",
+          "domainName": "northwindbeans.com"
+        },
+        "amountMinorUnits": 1099,
+        "currency": "USD",
+        "requestedAt": "2026-09-03T12:00:00.000Z"
+      },
+      "historyCount": 2,
+      "diligence": [
+        {
+          "check": "trademark_clear",
+          "verdict": "clear",
+          "summary": "Nothing found that would block this act.",
+          "citations": [
+            {
+              "title": "Search results",
+              "url": "https://example.test/q",
+              "engine": "google"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
