@@ -1,0 +1,155 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1/documents/template/list",
+    "status": 200,
+    "body": {
+      "result": {
+        "data": {
+          "documentTemplates": [],
+          "rowCount": 0
+        },
+        "statusCode": 200,
+        "message": "OK"
+      },
+      "origin": "",
+      "dateTime": "2026-09-03T10:00:21.8800403Z",
+      "operationId": "196749f52cc07fcf4f141a84aca0c402"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1/documents/datasource/create",
+    "status": 200,
+    "body": {
+      "result": {
+        "data": {
+          "dataSourceGuid": "f6665267-3d6e-4c07-99d0-9a6bf007aa69",
+          "subscriptionGuid": "<redacted>",
+          "ownerGuid": "<redacted>",
+          "lastModifiedUserGuid": "<redacted>",
+          "name": "chancery-writ-2026-09-03T10-00-21-294Z",
+          "description": "Chancery writ of delegated authority",
+          "urn": null,
+          "query": null,
+          "variables": null,
+          "loadMethod": "Storage",
+          "createdDate": "2026-09-03T10:00:22.1566667",
+          "lastModifiedDate": "2026-09-03T10:00:22.1566667",
+          "isDeleted": false,
+          "folderId": "00000000-0000-0000-0000-000000000000",
+          "ownerName": null,
+          "lastModifiedUserName": null
+        },
+        "statusCode": 200,
+        "message": "OK"
+      },
+      "origin": "",
+      "dateTime": "2026-09-03T10:00:22.1650226Z",
+      "operationId": "348664e7a5fb1532bbb4d1374a166b14"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1/documents/solution/create",
+    "status": 200,
+    "body": {
+      "result": {
+        "data": {
+          "documentSolution": {
+            "documentSolutionGuid": "7e2957dc-e9e6-4d42-8d9b-4189675ac829",
+            "subscriptionGuid": "<redacted>",
+            "ownerGuid": "<redacted>",
+            "lastModifiedUserGuid": "<redacted>",
+            "name": "chancery-writ-2026-09-03T10-00-21-294Z",
+            "description": "Chancery writ of delegated authority",
+            "folderId": "00000000-0000-0000-0000-000000000000",
+            "createdDate": "2026-09-03T10:00:22.2433333",
+            "lastModifiedDate": "2026-09-03T10:00:22.2433333",
+            "lastRequestDate": null,
+            "isDeleted": false
+          }
+        },
+        "statusCode": 200,
+        "message": "OK"
+      },
+      "origin": "",
+      "dateTime": "2026-09-03T10:00:22.2522868Z",
+      "operationId": "ec4e8597001ad9b739d2bbcaaccbe882"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1/documents/template/upload",
+    "status": 201,
+    "body": {
+      "result": {
+        "data": {
+          "files": [
+            {
+              "id": "1620ecdd-71d4-4c5e-b48b-864e31a8dcf2",
+              "fileName": "writ-template.docx"
+            }
+          ]
+        },
+        "statusCode": 201,
+        "message": "Created"
+      },
+      "origin": "POST https://demo.api.doctavian.com/v1/documents/template/upload",
+      "dateTime": "2026-09-03T10:00:22.5754644Z",
+      "operationId": "b671eeebee7142631e63480f1740fd27"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1/documents/data/upload",
+    "status": 201,
+    "body": {
+      "result": {
+        "data": {
+          "files": [
+            {
+              "id": "175216f2-4268-4369-b015-d71ebaa501fc",
+              "fileName": "writ-data.json"
+            }
+          ]
+        },
+        "statusCode": 201,
+        "message": "Created"
+      },
+      "origin": "POST https://demo.api.doctavian.com/v1/documents/data/upload",
+      "dateTime": "2026-09-03T10:00:22.7671777Z",
+      "operationId": "52b7365b540647511a9589d807884839"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1/documents/document/generate",
+    "status": 500,
+    "body": {
+      "error": {
+        "statusCode": 500,
+        "message": "Internal Server Error",
+        "innerErrors": [
+          {
+            "code": "TEMPLATE_READ_FAILED",
+            "message": "Failed to read the template.",
+            "userMessage": "There was an issue reading the template. Please check the template format",
+            "eventId": "4e20040b-f5d0-435a-95f0-e1c090d14475"
+          },
+          {
+            "code": "GENERATE_FUNCTION_FAILED",
+            "message": "Failed to generate the document.",
+            "userMessage": "There was an issue generating the document. Please check the input data and try again.",
+            "eventId": "689608b5-0778-4acb-b7a2-63bba254ab50"
+          }
+        ],
+        "externalErrors": []
+      },
+      "origin": "POST https://demo.api.doctavian.com/v1/documents/document/generate",
+      "dateTime": "2026-09-03T10:00:23.0953693Z",
+      "userId": "<redacted>",
+      "operationId": "e6cda325c93d4921ea0e9f41838c2d58"
+    }
+  }
+]

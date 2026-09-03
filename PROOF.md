@@ -69,7 +69,15 @@ curl -s -X POST https://na1.fusion.foxit.com/esign/api/v1/folders/createfolder \
 # → 401 {"allow":false,"reason":"Invalid credentials"}
 ```
 
-With the server's own credentials the same call gets past authentication and complains about a missing file instead. The refusal in the walkthrough is that first response, not a message we wrote.
+```bash
+pnpm boundary   # runs both attempts and reports what Foxit said
+```
+
+The refusal in the walkthrough is that first response, not a message we wrote.
+
+**And a finding that went against us.** We expected the second attempt — the agent's own PDF Services credentials — to be refused too, on the grounds that a PDF Services key is not eSign-entitled. It is not refused. It authenticates and comes back with `{"result":"error","error_description":"fileNames cannot be empty"}`, which is a validation complaint, not a refusal. So Foxit's key scoping does not separate the two services on a standard developer account.
+
+That is worth stating plainly because it is the argument: **a boundary cannot be delegated to a vendor's key scope.** It has to be about who holds a credential at all, which is why ours is structural — the agent process is built without any Foxit credential and a credential field on its surface does not compile.
 
 `pnpm smoke` runs this and every other integration against the real services and reports what came back. A check without a credential reports as **skipped**, never as passed.
 

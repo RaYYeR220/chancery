@@ -334,10 +334,34 @@ export async function proveESignIsUnreachable(
 
   const bodyText = (await response.text()).slice(0, BODY_CAP);
   const bodyResult = resultField(bodyText);
-  // The legacy host says "no" with a 200 and a body, so an auth refusal here is
-  // whichever of the two signals arrived.
+
+  // Distinguishing "refused" from "got in and then complained" is the whole
+  // job of this function, and the two look alike on this API.
+  //
+  //   401/403                                     refused, plainly
+  //   400 + {"allow":false,"reason":"Missing ..."} refused by the gateway
+  //   200 + {"result":"error","error_description":"fileNames cannot be empty"}
+  //                                               NOT refused — that is a
+  //                                               validation complaint, which
+  //                                               means authentication passed
+  //
+  // An earlier version treated any {"result":"error"} as a refusal, and so
+  // reported a proof that was not there. The legacy host does report auth
+  // failures that way too, so the description has to be read: only an
+  // auth-shaped one counts.
+  const gatewayRefusal = /"allow"\s*:\s*false/.test(bodyText);
+  const authShaped = /credential|unauthori[sz]|authenticat|invalid.{0,12}token|forbidden/i.test(
+    bodyText,
+  );
   const refused =
-    response.status === 401 || response.status === 403 || bodyResult === "error";
+    response.status === 401 ||
+    response.status === 403 ||
+    (response.status === 400 && gatewayRefusal) ||
+    (bodyResult === "error" && authShaped);
+
+  // Reaching the endpoint and being told the request is malformed means the
+  // caller is inside. That is an accepted call, however unsuccessful.
+  const acceptedDespiteError = bodyResult === "error" && !authShaped;
 
   return {
     attempt: options.attempt,
@@ -345,7 +369,7 @@ export async function proveESignIsUnreachable(
     url,
     outcome: refused
       ? "refused-by-foxit"
-      : response.ok
+      : response.ok || acceptedDespiteError
         ? "accepted-by-foxit"
         : "other-foxit-error",
     status: response.status,

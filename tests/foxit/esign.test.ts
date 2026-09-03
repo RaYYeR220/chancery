@@ -117,7 +117,7 @@ describe("createfolder", () => {
     const created = await client.createFolder(request());
 
     expect(fake.calls).toHaveLength(1);
-    expect(fake.last().pathname).toBe("/esign/api/v1/createfolder");
+    expect(fake.last().pathname).toBe("/esign/api/v1/folders/createfolder");
     expect(fake.last().headers.get("client_id")).toBe("cid-esign");
     expect(fake.last().body).toMatchObject({
       sendNow: true,
@@ -200,7 +200,7 @@ describe("the legacy host's 200-on-failure convention", () => {
     await client.createFolder(request());
     await client.createFolder(request());
 
-    expect(fake.nth(0).pathname).toBe("/api/v1/createfolder");
+    expect(fake.nth(0).pathname).toBe("/api/v1/folders/createfolder");
     expect(fake.nth(0).headers.get("authorization")).toBe("Bearer token-1");
     expect(fake.nth(1).headers.get("authorization")).toBe("Bearer token-2");
   });

@@ -150,7 +150,7 @@ describe("generation flow", () => {
 
   it("uploads the template as multipart under the field name `file`", async () => {
     const { fake, doctavian } = client({
-      "POST /v1/documents/template/upload": () => jsonResponse({ result: { data: { id: "tpl-1" } } }),
+      "POST /v1/documents/template/upload": () => jsonResponse({ result: { data: { files: [{ id: "tpl-1", fileName: "writ-template.docx" }] } } }, 201),
     });
 
     await doctavian.uploadTemplate(
@@ -171,7 +171,7 @@ describe("generation flow", () => {
 
   it("uploads the data payload as a JSON file", async () => {
     const { fake, doctavian } = client({
-      "POST /v1/documents/data/upload": () => jsonResponse({ result: { data: { id: "dat-1" } } }),
+      "POST /v1/documents/data/upload": () => jsonResponse({ result: { data: { files: [{ id: "dat-1", fileName: "data.json" }] } } }, 201),
     });
 
     await doctavian.uploadData({ Writ: [{ Id: "w1" }] }, { dataSourceGuid: "ds-7" });
@@ -231,7 +231,7 @@ describe("generation flow", () => {
   it("downloads raw bytes without trying to parse them as JSON", async () => {
     const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37]);
     const { fake, doctavian } = client({
-      "POST /v1/documents/document/urn%3Adoc%3A9f2/download": () =>
+      "GET /v1/documents/document/urn%3Adoc%3A9f2/download": () =>
         binaryResponse(pdf, { contentType: "application/pdf", fileName: "writ.pdf" }),
     });
 
@@ -240,12 +240,12 @@ describe("generation flow", () => {
     expect(file.bytes).toEqual(pdf);
     expect(file.contentType).toBe("application/pdf");
     expect(file.fileName).toBe("writ.pdf");
-    expect(fake.calls[0].method).toBe("POST");
+    expect(fake.calls[0].method).toBe("GET");
   });
 
   it("still reports a JSON error body on a failed download", async () => {
     const { doctavian } = client({
-      "POST /v1/documents/document/missing/download": () =>
+      "GET /v1/documents/document/missing/download": () =>
         errorResponse({ error: "DocumentNotFound" }, 404, "Not Found"),
     });
 
@@ -263,10 +263,10 @@ describe("generation flow", () => {
         jsonResponse({ result: { data: { dataSourceGuid: "ds-7" } } }),
       "POST /v1/documents/solution/create": () =>
         jsonResponse({ result: { data: { documentSolutionGuid: "sol-3" } } }),
-      "POST /v1/documents/template/upload": () => jsonResponse({ result: { data: { id: "tpl-1" } } }),
-      "POST /v1/documents/data/upload": () => jsonResponse({ result: { data: { id: "dat-1" } } }),
+      "POST /v1/documents/template/upload": () => jsonResponse({ result: { data: { files: [{ id: "tpl-1", fileName: "writ-template.docx" }] } } }, 201),
+      "POST /v1/documents/data/upload": () => jsonResponse({ result: { data: { files: [{ id: "dat-1", fileName: "data.json" }] } } }, 201),
       "POST /v1/documents/document/generate": () => GENERATE_OK(),
-      "POST /v1/documents/document/urn%3Adoc%3A9f2/download": () => binaryResponse(pdf),
+      "GET /v1/documents/document/urn%3Adoc%3A9f2/download": () => binaryResponse(pdf),
     });
 
     const result = await doctavian.runGenerationFlow({
@@ -281,7 +281,7 @@ describe("generation flow", () => {
       "POST /v1/documents/template/upload",
       "POST /v1/documents/data/upload",
       "POST /v1/documents/document/generate",
-      "POST /v1/documents/document/urn%3Adoc%3A9f2/download",
+      "GET /v1/documents/document/urn%3Adoc%3A9f2/download",
     ]);
     expect(fake.calls[1].json).toMatchObject({ dataGuid: "ds-7" });
     expect(fake.calls[4].json).toEqual({
@@ -309,8 +309,8 @@ describe("generation flow", () => {
     const { fake, doctavian } = client({
       "POST /v1/documents/datasource/create": () => jsonResponse({ dataSourceGuid: "ds" }),
       "POST /v1/documents/solution/create": () => jsonResponse({ documentSolutionGuid: "sol" }),
-      "POST /v1/documents/template/upload": () => jsonResponse({ id: "tpl" }),
-      "POST /v1/documents/data/upload": () => jsonResponse({ id: "dat" }),
+      "POST /v1/documents/template/upload": () => jsonResponse({ result: { data: { files: [{ id: "tpl" }] } } }, 201),
+      "POST /v1/documents/data/upload": () => jsonResponse({ result: { data: { files: [{ id: "dat" }] } } }, 201),
       "POST /v1/documents/document/generate": () => GENERATE_OK(),
     });
 
@@ -341,8 +341,15 @@ describe("generation flow", () => {
   it("unwraps list responses whether they are bare arrays or nested", async () => {
     const { doctavian } = client({
       "GET /v1/documents/template/list": () =>
-        jsonResponse({ result: { data: [{ id: "tpl-1", name: "writ", fileFormat: "docx" }] } }),
-      "GET /v1/documents/document/list": () => jsonResponse([{ urn: "urn:doc:1", name: "writ" }]),
+        jsonResponse({
+          result: {
+            data: {
+              documentTemplates: [{ id: "tpl-1", name: "writ", fileFormat: "docx" }],
+              rowCount: 1,
+            },
+          },
+        }),
+      "GET /v1/documents/document/list": () => jsonResponse({ result: { data: { documents: [{ urn: "urn:doc:1", name: "writ" }], rowCount: 1 } } }),
     });
 
     expect(await doctavian.listTemplates()).toEqual([
@@ -429,7 +436,7 @@ describe("signatures flow", () => {
   it("uploads, creates, sends and audits an envelope", async () => {
     const audit = new Uint8Array([1, 2, 3]);
     const { fake, doctavian } = client({
-      "POST /v1/signatures/document/upload": () => jsonResponse({ result: { data: { id: "sdoc-1" } } }),
+      "POST /v1/signatures/document/upload": () => jsonResponse({ result: { data: { files: [{ id: "sdoc-1" }] } } }, 201),
       "POST /v1/signatures/envelope/create": () =>
         jsonResponse({ result: { data: { envelopeId: "env-9" } } }),
       "GET /v1/signatures/envelope/env-9/send": () =>

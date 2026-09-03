@@ -19,11 +19,13 @@
  * whole flow be exercised from fixtures with no credentials and no network.
  */
 
+import { DOCTAVIAN_DEMO_BASE_URL, refreshAccessToken } from "./auth";
 import {
   DoctavianApiError,
   DoctavianKeyScopeError,
   DoctavianResponseError,
 } from "./errors";
+import { STORAGE_TYPE } from "./types";
 import type {
   ConsumptionEntry,
   CreateDataSourceInput,
@@ -37,12 +39,14 @@ import type {
   DoctavianClientConfig,
   DoctavianFile,
   DoctavianPath,
+  DoctavianRefreshConfig,
   EnvelopeAudit,
   GenerateDocumentInput,
   GenerateDocumentResult,
   FetchLike,
   OutputFileFormat,
   SendEnvelopeResult,
+  StorageType,
   TemplateFileFormat,
   TemplateSummary,
   UploadResult,
@@ -99,20 +103,76 @@ export interface RunGenerationFlowResult {
   document: DoctavianBinary | null;
 }
 
+/**
+ * The demo tenant is a separate host, so the base URL is configuration rather
+ * than a constant. Reading the env here keeps every call site from having to.
+ */
+export function defaultDoctavianBaseUrl(): string {
+  const fromEnv =
+    typeof process !== "undefined" ? process.env?.DOCTAVIAN_BASE_URL : undefined;
+  return fromEnv && fromEnv.length > 0 ? fromEnv : DOCTAVIAN_DEMO_BASE_URL;
+}
+
 export class DoctavianClient {
   private readonly baseUrl: string;
   private readonly bearerToken: string | (() => string | Promise<string>);
   private readonly apiKeys: Record<DoctavianArea, string>;
   private readonly fetchImpl: FetchLike;
+  private readonly refreshConfig?: DoctavianRefreshConfig;
+  /** Set once a refresh has happened; overrides the configured bearer. */
+  private currentToken: string | null = null;
+  private currentRefreshToken: string | null = null;
+  private tokenExpiresAt: number | null = null;
+  /** Concurrent calls share one refresh rather than racing to spend the token. */
+  private refreshInFlight: Promise<void> | null = null;
 
   constructor(config: DoctavianClientConfig) {
-    this.baseUrl = config.baseUrl.replace(/\/+$/, "");
+    this.baseUrl = (config.baseUrl ?? defaultDoctavianBaseUrl()).replace(/\/+$/, "");
     this.bearerToken = config.bearerToken;
     this.apiKeys = {
       documents: config.documentsApiKey,
       signatures: config.signaturesApiKey,
     };
     this.fetchImpl = config.fetchImpl ?? globalThis.fetch.bind(globalThis);
+    this.refreshConfig = config.refresh;
+    this.currentRefreshToken = config.refresh?.refreshToken ?? null;
+  }
+
+  /**
+   * Mints a fresh access token now. Callers rarely need this — a 401 refreshes
+   * and retries on its own — but a long batch is cheaper to start with a known
+   * good token than to discover the problem three calls in.
+   */
+  async refreshToken(): Promise<void> {
+    if (!this.refreshConfig || !this.currentRefreshToken) {
+      throw new DoctavianResponseError(
+        "no refresh token configured; construct the client with `refresh`",
+        null,
+      );
+    }
+    // One refresh at a time: the refresh token is single-use on Entra, so two
+    // parallel refreshes would invalidate each other.
+    this.refreshInFlight ??= this.doRefresh().finally(() => {
+      this.refreshInFlight = null;
+    });
+    return this.refreshInFlight;
+  }
+
+  private async doRefresh(): Promise<void> {
+    const config = this.refreshConfig;
+    if (!config || !this.currentRefreshToken) return;
+    const tokens = await refreshAccessToken({
+      refreshToken: this.currentRefreshToken,
+      baseUrl: this.baseUrl,
+      tokenUrl: config.tokenUrl,
+      clientId: config.clientId,
+      scope: config.scope,
+      fetchImpl: this.fetchImpl,
+    });
+    this.currentToken = tokens.accessToken;
+    this.currentRefreshToken = tokens.refreshToken;
+    this.tokenExpiresAt = tokens.expiresAt;
+    await config.onRefresh?.(tokens);
   }
 
   /* ------------------------------------------------- generation flow */
@@ -162,8 +222,9 @@ export class DoctavianClient {
       "/v1/documents/template/upload",
       { ...file, contentType: file.contentType ?? DOCX_MIME },
       extra,
+      STORAGE_TYPE.template,
     );
-    return { id: requireId(body, ["id", "urn", "guid", "templateId"]) };
+    return readUploadResult(body);
   }
 
   /** Step 4 of 6. Same multipart shape as the template upload. */
@@ -186,8 +247,9 @@ export class DoctavianClient {
       "/v1/documents/data/upload",
       file,
       extra,
+      STORAGE_TYPE.data,
     );
-    return { id: requireId(body, ["id", "urn", "guid", "dataId"]) };
+    return readUploadResult(body);
   }
 
   /**
@@ -222,18 +284,21 @@ export class DoctavianClient {
   /**
    * Step 6 of 6 — the response is the file itself, so nothing here parses JSON.
    *
-   * The generation brief writes this call as a GET while the integration notes
-   * write it as a POST; we default to POST and leave the method overridable so
-   * the first live call can settle it without a code change.
+   * GET, verified live and in the spec. `X-Storage-Type` must name the
+   * container the file was written to; a generated document delivered to
+   * Storage lands in `document-data`, and an unrecognised value comes back as a
+   * generic `FILE_DOWNLOAD_FAILED` rather than as anything that names the
+   * header.
    */
   async downloadDocument(
     urn: string,
-    options: { method?: "GET" | "POST" } = {},
+    options: { method?: "GET" | "POST"; storageType?: StorageType } = {},
   ): Promise<DoctavianBinary> {
     return this.requestBinary({
       area: "documents",
-      method: options.method ?? "POST",
+      method: options.method ?? "GET",
       path: `/v1/documents/document/${encodeURIComponent(urn)}/download`,
+      storageType: options.storageType ?? STORAGE_TYPE.data,
     });
   }
 
@@ -243,7 +308,7 @@ export class DoctavianClient {
       method: "GET",
       path: "/v1/documents/template/list",
     });
-    return readList(raw).map((entry) => ({
+    return readList(raw, "documentTemplates").map((entry) => ({
       id: readString(entry, "id") ?? readString(entry, "urn") ?? "",
       name: readString(entry, "name") ?? "",
       fileFormat: readString(entry, "fileFormat") ?? undefined,
@@ -258,7 +323,7 @@ export class DoctavianClient {
       method: "GET",
       path: "/v1/documents/document/list",
     });
-    return readList(raw).map((entry) => ({
+    return readList(raw, "documents").map((entry) => ({
       id: readString(entry, "urn") ?? readString(entry, "id") ?? "",
       name: readString(entry, "name") ?? "",
       fileFormat: readString(entry, "fileFormat") ?? undefined,
@@ -331,8 +396,10 @@ export class DoctavianClient {
       "signatures",
       "/v1/signatures/document/upload",
       { ...file, contentType: file.contentType ?? "application/pdf" },
+      {},
+      STORAGE_TYPE.signatureDocument,
     );
-    return { id: requireId(body, ["id", "documentId", "urn", "guid"]) };
+    return readUploadResult(body);
   }
 
   /** Documents, signers, fields and settings are one body, wired by reference ids. */
@@ -405,6 +472,7 @@ export class DoctavianClient {
     path: DoctavianPath<A>,
     file: DoctavianFile,
     fields: Record<string, string> = {},
+    storageType?: StorageType,
   ): Promise<unknown> {
     const form = new FormData();
     // A fresh ArrayBuffer copy: a Blob over a view into a pooled Node buffer can
@@ -417,7 +485,7 @@ export class DoctavianClient {
       file.fileName,
     );
     for (const [key, value] of Object.entries(fields)) form.append(key, value);
-    return this.request<unknown>({ area, method: "POST", path, form });
+    return this.request<unknown>({ area, method: "POST", path, form, storageType });
   }
 
   private async request<T>(spec: {
@@ -426,8 +494,9 @@ export class DoctavianClient {
     path: string;
     json?: unknown;
     form?: FormData;
+    storageType?: StorageType;
   }): Promise<T> {
-    const response = await this.send(spec);
+    const response = await this.sendWithRefresh(spec);
     const text = await response.text();
     const body = parseMaybeJson(text);
     if (!response.ok) throw this.toError(spec, response, body);
@@ -438,8 +507,9 @@ export class DoctavianClient {
     area: DoctavianArea;
     method: string;
     path: string;
+    storageType?: StorageType;
   }): Promise<DoctavianBinary> {
-    const response = await this.send(spec);
+    const response = await this.sendWithRefresh(spec);
     if (!response.ok) {
       // Only the failure path is text: an error body is JSON even here.
       const body = parseMaybeJson(await response.text());
@@ -455,12 +525,40 @@ export class DoctavianClient {
     };
   }
 
+  /**
+   * One retry, and only for 401.
+   *
+   * An expired access token and a mis-scoped api key both answer 401, and the
+   * difference matters: refreshing fixes the first and can never fix the
+   * second, so the retry happens once and the second answer is returned as-is.
+   * `FormData` is re-sendable — it is a value, not a stream — so a multipart
+   * upload survives the retry without being rebuilt.
+   */
+  private async sendWithRefresh(spec: {
+    area: DoctavianArea;
+    method: string;
+    path: string;
+    json?: unknown;
+    form?: FormData;
+    storageType?: StorageType;
+  }): Promise<Response> {
+    const response = await this.send(spec);
+    if (response.status !== 401 || !this.canRefresh()) return response;
+    await this.refreshToken();
+    return this.send(spec);
+  }
+
+  private canRefresh(): boolean {
+    return this.refreshConfig !== undefined && this.currentRefreshToken !== null;
+  }
+
   private async send(spec: {
     area: DoctavianArea;
     method: string;
     path: string;
     json?: unknown;
     form?: FormData;
+    storageType?: StorageType;
   }): Promise<Response> {
     assertPathInArea(spec.area, spec.path);
     const headers: Record<string, string> = {
@@ -473,6 +571,7 @@ export class DoctavianClient {
     // FormData must set its own content-type: the multipart boundary is
     // generated by fetch and a hand-written header would not match it.
     if (spec.json !== undefined) headers["content-type"] = "application/json";
+    if (spec.storageType) headers["x-storage-type"] = spec.storageType;
 
     return this.fetchImpl(`${this.baseUrl}${spec.path}`, {
       method: spec.method,
@@ -483,6 +582,13 @@ export class DoctavianClient {
   }
 
   private async resolveToken(): Promise<string> {
+    // Refresh ahead of expiry rather than on it: Doctavian rejects tokens
+    // within ~2 minutes of expiring, so "not expired yet" is not good enough.
+    if (this.canRefresh() && this.tokenExpiresAt !== null) {
+      const skew = this.refreshConfig?.skewMs ?? 120_000;
+      if (Date.now() >= this.tokenExpiresAt - skew) await this.refreshToken();
+    }
+    if (this.currentToken) return this.currentToken;
     return typeof this.bearerToken === "function"
       ? this.bearerToken()
       : this.bearerToken;
@@ -545,6 +651,21 @@ function readConsumption(raw: unknown): ConsumptionEntry[] {
     const value = readNumber(entry, "value");
     return dimension === null || value === null ? [] : [{ dimension, value }];
   });
+}
+
+/**
+ * Both upload endpoints answer `201` with `result.data.files: [{ id, fileName }]`
+ * — an array even for a single file, and the id is *not* on the data object
+ * itself. Verified live; the spec's own examples do not show this shape.
+ */
+function readUploadResult(raw: unknown): UploadResult {
+  const data = unwrapData(raw);
+  if (isRecord(data) && Array.isArray(data.files) && data.files.length > 0) {
+    const first = data.files[0];
+    const id = readString(first, "id");
+    if (id) return { id, fileName: readString(first, "fileName") ?? undefined };
+  }
+  return { id: requireId(raw, ["id", "urn", "guid"]) };
 }
 
 function requireId(raw: unknown, keys: string[]): string {

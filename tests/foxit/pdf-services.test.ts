@@ -121,7 +121,7 @@ describe("transport", () => {
 describe("documents", () => {
   it("percent-encodes a document id into a single path segment", async () => {
     const fake = fakeFetch({ bytes: draftPdf() });
-    await client(fake).download("../../esign/api/v1/createfolder");
+    await client(fake).download("../../esign/api/v1/folders/createfolder");
 
     const { pathname } = fake.last();
     expect(pathname.startsWith("/pdf-services/api/documents/")).toBe(true);
@@ -232,10 +232,10 @@ describe("path scope", () => {
   });
 
   it("refuses an eSign path however it is reached", () => {
-    expect(() => assertReversiblePath("/esign/api/v1/createfolder")).toThrow(FoxitScopeError);
-    expect(() => assertReversiblePath("/pdf-services/api/../esign/api/v1/createfolder")).toThrow(
+    expect(() => assertReversiblePath("/esign/api/v1/folders/createfolder")).toThrow(FoxitScopeError);
+    expect(() => assertReversiblePath("/pdf-services/api/../esign/api/v1/folders/createfolder")).toThrow(
       FoxitScopeError,
     );
-    expect(() => assertReversiblePath("/api/v1/createfolder")).toThrow(FoxitScopeError);
+    expect(() => assertReversiblePath("/api/v1/folders/createfolder")).toThrow(FoxitScopeError);
   });
 });

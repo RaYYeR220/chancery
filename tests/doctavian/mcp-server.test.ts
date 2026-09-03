@@ -155,14 +155,14 @@ describe("tool behaviour", () => {
     const { client, fake } = await connect({
       "POST /v1/documents/datasource/create": () => jsonResponse({ dataSourceGuid: "ds" }),
       "POST /v1/documents/solution/create": () => jsonResponse({ documentSolutionGuid: "sol" }),
-      "POST /v1/documents/template/upload": () => jsonResponse({ id: "tpl" }),
-      "POST /v1/documents/data/upload": () => jsonResponse({ id: "dat" }),
+      "POST /v1/documents/template/upload": () => jsonResponse({ result: { data: { files: [{ id: "tpl" }] } } }, 201),
+      "POST /v1/documents/data/upload": () => jsonResponse({ result: { data: { files: [{ id: "dat" }] } } }, 201),
       "POST /v1/documents/document/generate": () =>
         jsonResponse({
           result: { data: { document: { urn: "urn:doc:1" } } },
           consumption: [{ dimension: "documents-generated", value: 1 }],
         }),
-      "POST /v1/documents/document/urn%3Adoc%3A1/download": () =>
+      "GET /v1/documents/document/urn%3Adoc%3A1/download": () =>
         binaryResponse(PDF, { fileName: "writ.pdf" }),
     });
 
@@ -189,7 +189,7 @@ describe("tool behaviour", () => {
 
   it("returns a downloaded document as base64 with its headers", async () => {
     const { client } = await connect({
-      "POST /v1/documents/document/urn%3Adoc%3A5/download": () =>
+      "GET /v1/documents/document/urn%3Adoc%3A5/download": () =>
         binaryResponse(PDF, { contentType: "application/pdf", fileName: "writ.pdf" }),
     });
 

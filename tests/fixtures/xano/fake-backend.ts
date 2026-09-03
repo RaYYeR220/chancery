@@ -137,7 +137,7 @@ async function route(request: RecordedRequest, ctx: Context): Promise<Reply> {
     return { body: wireWrit(await ctx.store.createWrit(spec)) };
   }
 
-  if (key === "GET /writ/by_domain") {
+  if (key === "GET /writ_by_domain") {
     const domain = request.query.get("domain") ?? "";
     const writ = await ctx.store.getWritByAgentDomain(domain);
     return { body: writ === null ? null : wireWrit(writ) };

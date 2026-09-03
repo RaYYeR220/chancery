@@ -37,7 +37,8 @@ That is why the client exposes `readFromRegistrar()` separately from the verific
 The API is real. Two limits are inherent to the tier rather than to our integration, and we do not paper over either:
 
 - Every envelope carries a **TEST-mode watermark for 30 days**, which cannot be cleared through the API.
-- The agent-facing surface holds no signing credential at all. That is the design, not a limitation — and it means the 401 shown in the walkthrough is a real response from Foxit, not a simulated one.
+- The agent-facing surface holds no Foxit credential at all. That is the design, not a limitation — and it means the refusal shown in the walkthrough (`400 {"allow":false,"reason":"Missing credentials..."}`) is a real response from Foxit, not a simulated one. Run `pnpm boundary` to see it happen.
+- **Foxit's own key scoping does not separate PDF Services from eSign on a developer account.** We assumed it did and were wrong; see the negative result in `CLAIMS.md`. It is the reason our boundary is about who holds a credential rather than about what a credential is scoped to.
 
 ### Reading the signed writ back — Nutrient DWS
 The API is real. Two things to be honest about:
@@ -50,7 +51,7 @@ The API is real. Two things to be honest about:
 ### Due diligence — SerpApi
 The API is real. **The fixtures are not captured responses.** They are captured-*shape*: hand-built to the documented structure of each engine, because we had no key while building. That means the parsers are tested against the documented contract rather than against reality, and a field name we got wrong would show up as a `unknown` verdict — which denies — rather than as a false pass.
 
-Three specific things remain unconfirmed and are marked as such in the code: the exact accepted value of the patents `litigation` parameter, whether case law is its own engine or a filter on scholar, and the `json_restrictor` projections. The restrictors default to **off** for exactly this reason: a projection that dropped a key the rules read would turn a real answer into `unknown`, which is a false denial.
+One of those unknowns is now settled by a live call: the patents `litigation` parameter takes the literal strings `YES` and `NO` and rejects a boolean outright, which no documentation said. Two remain, marked as such in the code: whether case law is its own engine or a filter on scholar, and the `json_restrictor` projections. The restrictors default to **off** for exactly that reason — a projection that dropped a key the rules read would turn a real answer into `unknown`, which is a false denial.
 
 ### Backend of record — Xano
 Real API. An **in-memory store implementing the same interface** ships alongside it, and it is not a fallback to hide behind: it is what lets the demo run with zero credentials. It uses the same ledger chaining code as the real store — it does not reimplement hashing — so a chain built in memory verifies identically to one built in Xano.
@@ -68,4 +69,5 @@ Real inference against a real model. Every test drives a **scripted fake model**
 - **A signature that could not be verified denies.** Silence about a signature is not evidence that it is good.
 - **A missing confidence score is not treated as low confidence**, because the vendor's own documentation says it is not. It is treated as no score.
 - **The benchmark scores a denial for the wrong reason as a failure.** Scoring only the outcome would have made the suite easier to pass and worth less.
+- **We published a claim we had to withdraw.** We believed a PDF Services key could not authenticate to eSign, and said so. Testing it against the live API showed otherwise, and the tooling that was supposed to prove it had a classifier bug that would have reported success either way. Both are fixed and the finding is in `CLAIMS.md` rather than quietly dropped.
 - **No fabricated values anywhere.** Where a dependency cannot answer, the result is reported as unavailable. There is no code path that invents a number or a checkmark to fill a gap.

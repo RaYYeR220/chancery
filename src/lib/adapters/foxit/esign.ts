@@ -62,8 +62,15 @@ export const ESIGN_SURFACES: Record<ESignSurface, ESignSurfaceSpec> = {
  * one place. `createfolder` is the one confirmed present in the gateway spec;
  * the other two are overridable for the same reason the PDF Services paths are.
  */
+/**
+ * Operation paths, confirmed against the live gateway.
+ *
+ * `createfolder` sits under `folders/`. Calling it without that segment returns
+ * a Tomcat 404 page rather than a JSON error, which is easy to mistake for a
+ * refusal — so it is pinned here rather than assembled at each call site.
+ */
 export const ESIGN_OPERATIONS = {
-  createFolder: "createfolder",
+  createFolder: "folders/createfolder",
   folderStatus: "getfolderstatus",
   downloadDocuments: "downloadfolderdocuments",
 } as const;

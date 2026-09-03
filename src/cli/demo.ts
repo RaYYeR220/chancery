@@ -11,8 +11,13 @@
  * whole argument happen rather than read a description of it.
  */
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { bundleDigest, decideWithEvidence } from "../lib/core/evidence";
 import { decide } from "../lib/core/gatekeeper";
 import { DEMO_SCRIPT, type DemoStep } from "../lib/demo/script";
+import { serializeWritRecord } from "../lib/core/writ-record";
 import * as w from "../lib/eval/world";
 import type { ActHistoryEntry, Decision } from "../lib/core/types";
 
@@ -68,8 +73,23 @@ function renderVerdict(decision: Decision): string {
   return lines.join("\n");
 }
 
+/**
+ * Where to write the evidence for each decided step.
+ *
+ * A bundle is only worth publishing if someone can act on it, so the demo emits
+ * real ones rather than describing them: `pnpm verify --bundle <file>` re-derives
+ * any of these offline, and disagreement is reported rather than smoothed over.
+ */
+function evidenceDir(): string | null {
+  const flag = process.argv.indexOf("--evidence");
+  if (flag === -1) return null;
+  return process.argv[flag + 1] ?? "evidence";
+}
+
 function main(): number {
   const history: ActHistoryEntry[] = [];
+  const outDir = evidenceDir();
+  if (outDir) mkdirSync(outDir, { recursive: true });
   let failures = 0;
 
   process.stdout.write(`\n${c(BOLD, "Chancery")} — power of attorney for AI agents\n`);
@@ -95,16 +115,52 @@ function main(): number {
             ? { lookup: { outcome: "revoked" as const, record: w.record({ status: "revoked" }) } }
             : {};
 
-      const decision = decide(
-        w.baseline({
-          request: step.request,
-          diligence: step.diligence,
-          history: [...history],
-          ...broken,
-        }),
-      );
+      const input = w.baseline({
+        request: step.request,
+        diligence: step.diligence,
+        history: [...history],
+        ...broken,
+      });
+      const decision = decide(input);
 
       process.stdout.write(`\n${renderVerdict(decision)}\n`);
+
+      if (outDir) {
+        const bundle = decideWithEvidence({
+          resolution: {
+            name: `_writ.${w.AGENT.domain}`,
+            txtRecords: [serializeWritRecord(w.record())],
+            resolver: "https://cloudflare-dns.com/dns-query",
+            authenticatedData: true,
+            resolvedAt: w.NOW,
+          },
+          lookup: input.lookup,
+          document: {
+            url: `https://chancery.dev/w/${w.writ().id}`,
+            sha256: input.fetchedDocumentHash ?? w.DOCUMENT_HASH,
+            byteLength: 48_120,
+            signature: { verified: true, method: "pades", profile: "b-lt" },
+          },
+          extraction: {
+            method: "nutrient/understand",
+            responseDigest: "0".repeat(64),
+            groundingPolicy: {
+              acceptedMatches: ["id_match", "id_match_multiblock", "id_match_partial"],
+              confidenceThreshold: null,
+            },
+          },
+          policy: input.policy,
+          request: step.request,
+          history: [...history],
+          diligence: step.diligence ?? [],
+          now: w.NOW,
+        });
+        const file = join(outDir, `${step.id}.json`);
+        writeFileSync(file, `${JSON.stringify(bundle, null, 2)}\n`);
+        process.stdout.write(
+          c(DIM, `             evidence ${file}  digest ${bundleDigest(bundle).slice(0, 16)}\n`),
+        );
+      }
 
       const matched =
         decision.outcome === step.expect.outcome &&

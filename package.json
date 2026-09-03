@@ -10,11 +10,13 @@
     "test": "vitest run",
     "testw": "vitest",
     "typecheck": "tsc --noEmit",
+    "writ": "tsx src/cli/writ.ts",
     "verify": "tsx src/cli/verify.ts",
     "bench": "tsx src/cli/bench.ts",
     "demo": "tsx src/cli/demo.ts",
     "smoke": "tsx src/cli/smoke.ts",
-    "anchor": "tsx src/cli/anchor.ts"
+    "anchor": "tsx src/cli/anchor.ts",
+    "boundary": "tsx src/cli/boundary.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

@@ -71,7 +71,7 @@ function service(
 const SEND_ROUTES: Record<string, Responder> = {
   "POST /pdf-services/api/documents/upload": { body: upload },
   "POST /pdf-services/api/documents/*": { body: shareLink },
-  "POST /esign/api/v1/createfolder": { body: createFolder },
+  "POST /esign/api/v1/folders/createfolder": { body: createFolder },
 };
 
 describe("requestSignature", () => {
@@ -82,7 +82,7 @@ describe("requestSignature", () => {
     expect(fake.paths()).toEqual([
       "/pdf-services/api/documents/upload",
       `/pdf-services/api/documents/${upload.documentId}/create-share-link`,
-      "/esign/api/v1/createfolder",
+      "/esign/api/v1/folders/createfolder",
     ]);
     expect(session.envelopeId).toBe(createFolder.folderId);
     expect(session.signingUrl).toBe(
@@ -131,7 +131,7 @@ describe("requestSignature", () => {
   it("refuses a folder that came back with no session URL to send a human to", async () => {
     const { signatures } = service({
       ...SEND_ROUTES,
-      "POST /esign/api/v1/createfolder": {
+      "POST /esign/api/v1/folders/createfolder": {
         body: { folderId: "folder_x", embeddedSigningSessions: [] },
       },
     });
@@ -167,7 +167,7 @@ describe("the approval gate is bound to bytes", () => {
 
     await signatures.requestSignature(SIGNING_REQUEST);
 
-    expect(fake.paths()).toEqual(["/esign/api/v1/createfolder"]);
+    expect(fake.paths()).toEqual(["/esign/api/v1/folders/createfolder"]);
     expect(fake.last().body).toMatchObject({
       fileUrls: ["https://na1.fusion.foxit.com/pdf-services/share/approved-copy"],
     });

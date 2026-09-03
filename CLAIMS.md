@@ -37,8 +37,10 @@ Every public statement we make about Chancery, tagged by what actually backs it.
 
 | Claim | Tier | How to check |
 | --- | --- | --- |
-| The agent-facing surface cannot reach the signing service, because it holds no signing credential. | MODELED | Enforced in four independent places: the agent surface holds only functions so a credential field will not compile; PDF Services credentials are not assignable where eSign ones are required; every assembled path is checked before it reaches the wire; and the key itself is not eSign-entitled. |
-| **An agent attempting to send for signature receives a real refusal from Foxit, not a refusal from us.** | **VERIFIED-LIVE** | `pnpm smoke`. Against `POST /esign/api/v1/folders/createfolder`: no credentials returns `400 Missing credentials: provide both 'client_id' and 'client_secret' headers`, wrong credentials returns `401 Invalid credentials`, and the server's own credentials get past authentication. The refusal proof has no local branch that refuses — it posts and reports what came back. |
+| The agent-facing surface holds no Foxit credential of any kind. | REPRODUCIBLE | Enforced in three places: the agent surface's members are all functions, so a credential field does not compile; PDF Services credentials are not assignable where eSign ones are required; and every assembled path is checked before it reaches the wire. `tests/foxit/agent-surface.test.ts` exercises all nine tools and asserts nothing addressed to `/esign/` ever left the process. |
+| An agent with **no** Foxit credential is refused by Foxit. | **VERIFIED-LIVE** | `pnpm boundary`. |
+| **An agent attempting to send for signature receives a real refusal from Foxit, not a refusal from us.** | **VERIFIED-LIVE** | `pnpm boundary`. Against `POST /esign/api/v1/folders/createfolder`, sending nothing returns `400 {"allow":false,"reason":"Missing credentials..."}`. The probe has no local branch that refuses — it posts and reports what came back. |
+| ~~A PDF Services key cannot authenticate to eSign.~~ | **DISPROVED** | We tested it and it is false — see the finding below. |
 | The signed document's cryptographic signature is verified before any act is allowed. | MODELED | `signatureValid !== true` denies, including when the check could not be performed. |
 
 ## Grounding
@@ -78,6 +80,18 @@ Things a reader might reasonably assume that we are explicitly not asserting:
 - **This is not a legal opinion, and a writ is not legal advice.** A trademark finding is evidence, not adjudication.
 - **A signature produced on a vendor free tier chains to a test certificate, not a publicly trusted root.** It is cryptographically real and it is not a production trust anchor.
 - **`document.send_for_signature` and the other act kinds are gated identically but only `domain.register` has an executor wired.** The rest are modelled end to end and refused or allowed correctly; they just do not yet cause anything to happen.
+### A negative result we went looking for and found
+
+**Foxit's own key scoping does not separate PDF Services from eSign on a standard developer account.** We assumed it did, built a claim on it, then tested it: the agent's PDF Services credentials authenticate to eSign and come back with `{"result":"error","error_description":"fileNames cannot be empty"}` — a validation complaint, which means the call got in.
+
+Two things follow, and both make the design better rather than worse.
+
+First, our classifier was wrong. It read any `{"result":"error"}` as a refusal, so it would have reported a proof that was not there. It now distinguishes an auth-shaped error from a validation one, and `pnpm boundary` reports `accepted-by-foxit` for that attempt.
+
+Second, and more usefully: **a boundary cannot be delegated to a vendor's key scope.** It has to be about who holds a credential at all. That is why ours is structural — the agent process is constructed without any Foxit credential, and a credential field on its surface does not compile.
+
+---
+
 - **We do not claim the extraction model is accurate.** We claim that when it is unsure, the clause stops working — which is a different and much weaker claim, and the only one the design needs.
 - **Extraction is cached per document, not re-run per act.** Safe because the hash is re-checked every time, but it is the one cached input in the path and we are not pretending otherwise. See `MOCKS.md`.
 - **The benchmark measures the decision engine, not the extraction model or the search provider.** It says the gate behaves correctly given evidence; it says nothing about how good the evidence is.

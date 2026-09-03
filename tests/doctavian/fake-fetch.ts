@@ -14,8 +14,10 @@ export interface RecordedRequest {
   url: string;
   pathname: string;
   headers: Record<string, string>;
-  /** Parsed JSON when the body was JSON, the FormData when it was multipart. */
+  /** Parsed JSON when the body parsed as JSON, else null. */
   json: unknown;
+  /** The raw string body, for the form-encoded token endpoint. */
+  text: string | null;
   form: FormData | null;
 }
 
@@ -40,7 +42,8 @@ export function createFakeFetch(routes: Record<string, Responder>): FakeFetch {
       url: input,
       pathname: url.pathname,
       headers: normalizeHeaders(init.headers),
-      json: typeof body === "string" ? JSON.parse(body) : null,
+      json: typeof body === "string" ? tryParse(body) : null,
+      text: typeof body === "string" ? body : null,
       form: body instanceof FormData ? body : null,
     };
     calls.push(recorded);
@@ -85,6 +88,14 @@ export function binaryResponse(
   const copy = new Uint8Array(bytes.length);
   copy.set(bytes);
   return new Response(new Blob([copy]), { status: 200, headers });
+}
+
+function tryParse(body: string): unknown {
+  try {
+    return JSON.parse(body);
+  } catch {
+    return null;
+  }
 }
 
 function normalizeHeaders(headers: HeadersInit | undefined): Record<string, string> {

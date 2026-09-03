@@ -16,6 +16,8 @@
  * than as a convention is what stops a documents key reaching a signatures
  * endpoint — see `DoctavianPath` below.
  */
+import type { DoctavianTokenSet } from "./auth";
+
 export type DoctavianArea = "documents" | "signatures";
 
 export type DocumentsPath = `/v1/documents/${string}`;
@@ -33,17 +35,43 @@ export type DoctavianPath<A extends DoctavianArea> = A extends "documents"
 /** Injectable so every test drives a fake and no test touches the network. */
 export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
+/**
+ * How the client re-mints an access token that expired mid-flow. Doctavian's
+ * tokens live 3599 seconds, which is shorter than a working session, so this is
+ * the difference between a recoverable 401 and a half-completed generation.
+ */
+export interface DoctavianRefreshConfig {
+  refreshToken: string;
+  clientId?: string;
+  /** Defaults to `${baseUrl}/public/v1/auth/microsoft/token`. */
+  tokenUrl?: string;
+  scope?: string;
+  /**
+   * Called with every new token set. Entra rotates the refresh token on use,
+   * so a caller that does not persist what it is handed will be unable to
+   * refresh again from a new process.
+   */
+  onRefresh?: (tokens: DoctavianTokenSet) => void | Promise<void>;
+  /** Refresh this far ahead of expiry. Defaults to 120s, per the docs' warning. */
+  skewMs?: number;
+}
+
 export interface DoctavianClientConfig {
-  /** Origin only, e.g. `https://api.doctavian.com`. The bare root 404s. */
-  baseUrl: string;
+  /**
+   * Origin only. Omit to take `DOCTAVIAN_BASE_URL`, falling back to the demo
+   * tenant — which is a different host from `api.doctavian.com`, not a path on
+   * it. The bare root 404s either way.
+   */
+  baseUrl?: string;
   /**
    * OAuth2 access token, or a provider called per request. Doctavian rejects
-   * tokens within ~2 minutes of expiry, so a long-lived client needs the
-   * provider form to survive its own token's lifetime.
+   * tokens within ~2 minutes of expiry, so a long-lived client needs either the
+   * provider form or `refresh` below to survive its own token's lifetime.
    */
   bearerToken: string | (() => string | Promise<string>);
   documentsApiKey: string;
   signaturesApiKey: string;
+  refresh?: DoctavianRefreshConfig;
   fetchImpl?: FetchLike;
 }
 
@@ -65,6 +93,31 @@ export interface DoctavianEnvelope<T> {
 
 export type LoadMethod = "Storage";
 export type DeliveryMethod = "Storage";
+
+/**
+ * `X-Storage-Type` selects the blob container a request reads or writes.
+ *
+ * The spec marks it required on every upload and download, but the server does
+ * not enforce it: an upload without it still answers `201` with a file id, and
+ * the failure only surfaces two calls later as `TEMPLATE_READ_FAILED` from
+ * generate, because the template was never written where the renderer looks. It
+ * is therefore not optional in this client — each endpoint pins its own value.
+ */
+export type StorageType =
+  | "document-template"
+  | "document-data"
+  | "document-input"
+  | "envelope-attachment";
+
+export const STORAGE_TYPE = {
+  /** Templates, and anything uploaded via `documents/document/upload`. */
+  template: "document-template",
+  /** Data payloads, and the container generated documents are delivered to. */
+  data: "document-data",
+  /** Documents on the signatures side of the API. */
+  signatureDocument: "document-input",
+  envelopeAttachment: "envelope-attachment",
+} as const satisfies Record<string, StorageType>;
 
 /** Template inputs are real Office files uploaded as-is. No HTML input. */
 export type TemplateFileFormat = "docx" | "xlsx" | "pptx";
@@ -121,9 +174,13 @@ export interface CreateSolutionResult {
   documentSolutionGuid: string;
 }
 
-/** Both uploads return an id that is used as a `urn` by the generate call. */
+/**
+ * Both uploads answer with `result.data.files[0].id`, and that id is what the
+ * generate call takes as a `urn`.
+ */
 export interface UploadResult {
   id: string;
+  fileName?: string;
 }
 
 export interface TemplateSummary {
