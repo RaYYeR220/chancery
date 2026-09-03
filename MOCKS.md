@@ -27,11 +27,13 @@ Two environments, and the difference matters:
 | --- | --- | --- |
 | API calls | real | real |
 | Registrations | real API, test credit | real, costs money |
-| **DNS resolution** | **never resolves publicly** | resolves |
+| **DNS resolution** | **never resolves publicly** | resolves, but **unsigned** |
 
 The sandbox is a real API against a real registrar with $100,000 of test credit — searches, availability, registrations, DNS record writes and DNSSEC all work exactly as in production. **What it cannot do is publish a zone the world can see.** So a writ anchored in the sandbox can be read back through the registrar's own API, and cannot be verified from outside by anyone else.
 
 That is why the client exposes `readFromRegistrar()` separately from the verification path, and why it is labelled as *not* verification. A sandbox anchor is a working integration; it is not a published authority.
+
+**Production resolves but is not DNSSEC-signed.** name.com's own default nameservers do not sign the zone — their DNSSEC page says so in as many words — so `chancery.live` resolves without an AD flag. Getting one means moving the domain to a signing nameserver set, which we are not doing hours after the delegation settled. Our verifier treats an unvalidated answer as unverified rather than assuming, so this shows up as a refusal with a reason rather than as a silent downgrade — which is the behaviour we would want either way.
 
 ### Signature — Foxit eSign
 The API is real. Two limits are inherent to the tier rather than to our integration, and we do not paper over either:
