@@ -12,7 +12,7 @@
 import { ACT_PRESETS, REVERSIBLE_CALLS, STATIONS, money, standingStations } from "@/app/_shared/content";
 import { CheckLadder, LineMap } from "@/components/line/LineMap";
 import { ActRunner } from "@/components/gate/ActRunner";
-import { LimitBoard } from "@/components/gate/LimitBoard";
+import { LimitBoard, MeterStrip } from "@/components/gate/LimitBoard";
 import { SuspensionBar, VerdictPanel } from "@/components/gate/Verdict";
 import { useSelectedAct, useSession } from "@/components/state/session";
 
@@ -77,6 +77,7 @@ export function TraceScreen() {
                 signed.
               </p>
             </div>
+            <MeterStrip gauges={session.gauges} act={act} />
           </div>
 
           <div className="rig rig--ink">

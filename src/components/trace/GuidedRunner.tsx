@@ -113,7 +113,7 @@ export function GuidedRunner({ session }: { session: SessionView }) {
           const played = index <= step;
           const current = index === next;
           const claim = entry.expect;
-          const answered = played && claim ? matchFor(session, entry.id) : null;
+          const answered = played && claim ? matchFor(session, index) : null;
 
           return (
             <li
@@ -157,13 +157,23 @@ export function GuidedRunner({ session }: { session: SessionView }) {
  * Did the engine answer what the narration claims? Read off the act log rather
  * than recomputed, so this compares the story against the verdict rather than
  * against a second opinion.
+ *
+ * Three steps ask for the same registration — the plain one, the one after the
+ * document is edited, and the one after revocation — so the act is found by how
+ * many earlier steps used that preset, not by taking the most recent match.
  */
-function matchFor(session: SessionView, stepId: string): boolean | null {
-  const entry = DEMO_SCRIPT.find((item) => item.id === stepId);
-  const op = (OPS[stepId] ?? []).find((candidate) => candidate.type === "act");
+function matchFor(session: SessionView, stepIndex: number): boolean | null {
+  const entry = DEMO_SCRIPT[stepIndex];
+  const op = (OPS[entry?.id ?? ""] ?? []).find((candidate) => candidate.type === "act");
   if (entry?.expect === undefined || op === undefined || op.type !== "act") return null;
 
-  const act = [...session.acts].reverse().find((candidate) => candidate.presetId === op.presetId);
+  const ordinal = DEMO_SCRIPT.slice(0, stepIndex).filter((earlier) =>
+    (OPS[earlier.id] ?? []).some(
+      (candidate) => candidate.type === "act" && candidate.presetId === op.presetId,
+    ),
+  ).length;
+
+  const act = session.acts.filter((candidate) => candidate.presetId === op.presetId)[ordinal];
   if (act === undefined) return null;
   return (
     act.outcome === entry.expect.outcome &&

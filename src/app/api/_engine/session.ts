@@ -55,7 +55,7 @@ export class DemoSession {
   readonly id: string;
   readonly createdAt: string;
 
-  readonly store = new MemoryWritStore({ evidenceBaseUrl: "https://chancery.example/receipt" });
+  readonly store: MemoryWritStore;
   readonly zone = new DemoZone();
   readonly desk: DemoDocumentDesk;
   readonly registry: DemoRegistry;
@@ -74,6 +74,13 @@ export class DemoSession {
   constructor() {
     this.id = randomUUID();
     this.createdAt = new Date().toISOString();
+    // A reference a solicitor would write on a cover sheet, not a UUID: the id
+    // is printed on screen and quoted in the ledger, so it has to be readable
+    // aloud.
+    this.store = new MemoryWritStore({
+      evidenceBaseUrl: "https://chancery.example/receipt",
+      newId: () => `WRIT-NW-${String(1000 + Math.floor(Math.random() * 8999))}`,
+    });
     const clock = () => new Date().toISOString();
 
     this.desk = new DemoDocumentDesk(clock);

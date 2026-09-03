@@ -12,7 +12,7 @@
 import { STATIONS, standingStations } from "@/app/_shared/content";
 import { CheckLadder, LineMap } from "@/components/line/LineMap";
 import { ActRunner } from "@/components/gate/ActRunner";
-import { LimitBoard } from "@/components/gate/LimitBoard";
+import { LimitBoard, MeterStrip } from "@/components/gate/LimitBoard";
 import { SuspensionBar, VerdictPanel } from "@/components/gate/Verdict";
 import { ServiceBoard } from "@/components/signage/ServiceBoard";
 import { useSelectedAct, useSession } from "@/components/state/session";
@@ -53,6 +53,7 @@ export function ConsoleScreen() {
                 runs.
               </p>
             </div>
+            <MeterStrip gauges={session.gauges} act={act} />
           </div>
 
           <div className="rig rig--ink">
@@ -81,11 +82,13 @@ export function ConsoleScreen() {
       <section className="band">
         <div className="wrap">
           <div className="band__head">
-            <h2 className="band__title">Granting authority</h2>
-            <p className="band__note">
-              An AI can draft the instrument. Only a human can commit to it, and the credential that
-              would let one be signed is never held by agent-facing code.
-            </p>
+            <div>
+              <h2 className="band__title">Granting authority</h2>
+              <p className="band__note">
+                An AI can draft the instrument. Only a human can commit to it, and the credential
+                that would let one be signed is never held by agent-facing code.
+              </p>
+            </div>
           </div>
           <IssueLine session={session} />
         </div>

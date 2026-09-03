@@ -203,3 +203,53 @@ function GaugeBody({
     </>
   );
 }
+
+/**
+ * The two gauges that accumulate, set small and light for the signage band.
+ *
+ * They sit beside the heading rather than below the fold because "how much is
+ * left" is the question a principal asks before any other, and because a band
+ * with a diagram in it should not also carry a column of air.
+ */
+export function MeterStrip({ gauges, act }: { gauges: GaugeView[]; act: ActView | null }) {
+  const count = gauges.find((gauge) => gauge.kind === "count");
+  const spend = gauges.find((gauge) => gauge.kind === "amount");
+  if (count === undefined || spend === undefined || count.max === null || spend.max === null) {
+    return null;
+  }
+
+  const code = act?.reasons[0]?.code;
+  const overCount = code === "COUNT_LIMIT_EXCEEDED";
+  const overSpend = code === "AMOUNT_LIMIT_EXCEEDED";
+  const currency = spend.currency ?? "USD";
+  const pending = act?.amountMinorUnits ?? 0;
+  const fill = Math.min(100, ((spend.used ?? 0) / spend.max) * 100);
+
+  return (
+    <div className="meterstrip">
+      <div className="meterstrip__cell" data-over={overCount ? "1" : undefined}>
+        <span className="meterstrip__k">Registrations</span>
+        <span className="meterstrip__v">
+          {count.used} of {count.max}
+        </span>
+        <span className="meterstrip__bar" role="img" aria-label={count.reading}>
+          {Array.from({ length: count.max }, (_, index) => (
+            <i key={index} data-filled={index < (count.used ?? 0) ? "1" : undefined} />
+          ))}
+          {overCount && <i data-over="1" />}
+        </span>
+      </div>
+
+      <div className="meterstrip__cell" data-over={overSpend ? "1" : undefined}>
+        <span className="meterstrip__k">Spend against the cap</span>
+        <span className="meterstrip__v">
+          {money(spend.used ?? 0, currency)} of {money(spend.max, currency)}
+        </span>
+        <span className="meterstrip__track" role="img" aria-label={spend.reading}>
+          <i style={{ width: `${fill}%` }} />
+          {overSpend && <b>{money((spend.used ?? 0) + pending - spend.max, currency)} over</b>}
+        </span>
+      </div>
+    </div>
+  );
+}

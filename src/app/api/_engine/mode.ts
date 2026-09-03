@@ -40,6 +40,13 @@ export function modeReport(): ModeReport {
   const serpapi = serpapiKey && liveDiligenceRequested();
   const xano = present("XANO_BASE_URL", "XANO_TOKEN");
 
+  /**
+   * Only two rows can read `live`, and they are the two that genuinely answer
+   * over the wire in this session. A seam whose credentials are configured but
+   * whose work is done in process reads `scripted` and says the credentials are
+   * there — a green badge over a local answer would be exactly the lie this
+   * board exists to prevent.
+   */
   const services: ServiceStatus[] = [
     {
       key: "decide",
@@ -56,8 +63,8 @@ export function modeReport(): ModeReport {
       role: "Where authority is published",
       supply: "live",
       detail:
-        "The verifier queries Cloudflare and Google over DoH for any real name. The demo agent's " +
-        "zone is served in-process and is labelled as such wherever it appears.",
+        "The verifier queries Cloudflare over DoH for any real name, with Google as a transport " +
+        "fallback. The demo agent's own zone is served in process and is labelled demo-zone wherever it appears.",
       requires: [],
       credentialsPresent: true,
     },
@@ -65,10 +72,10 @@ export function modeReport(): ModeReport {
       key: "doctavian",
       label: "Doctavian",
       role: "Generating the writ",
-      supply: doctavian ? "live" : "scripted",
+      supply: "scripted",
       detail: doctavian
-        ? "Credentials present. The demo session still renders locally so it stays reproducible."
-        : "The instrument is rendered in process from the same grants the gate enforces.",
+        ? "Credentials present and unused here. The instrument is rendered in process, from the same grants the gate enforces, so the walkthrough is reproducible."
+        : "The instrument is rendered in process, from the same grants the gate enforces.",
       requires: ["DOCTAVIAN_BEARER", "DOCTAVIAN_DOCUMENTS_KEY"],
       credentialsPresent: doctavian,
     },
@@ -76,9 +83,9 @@ export function modeReport(): ModeReport {
       key: "foxit",
       label: "Foxit eSign",
       role: "The signature ceremony",
-      supply: foxit ? "live" : "scripted",
+      supply: "scripted",
       detail: foxit
-        ? "Credentials present, held server-side. No agent-facing route can reach them."
+        ? "Credentials present, held server-side and unused here. No agent-facing route can reach them in either case."
         : "No signing credential is configured, so no agent path could reach one either.",
       requires: ["FOXIT_ESIGN_CLIENT_ID", "FOXIT_ESIGN_CLIENT_SECRET"],
       credentialsPresent: foxit,
@@ -87,9 +94,9 @@ export function modeReport(): ModeReport {
       key: "nutrient",
       label: "Nutrient DWS",
       role: "Reading the signed writ back",
-      supply: nutrient ? "live" : "scripted",
+      supply: "scripted",
       detail: nutrient
-        ? "Credentials present. Extraction is metered per page and is not run on every act."
+        ? "Credentials present and unused here; extraction is metered per page. Terms are read back in process, with a page and a box recorded for every clause."
         : "Terms are read back in process, with a page and a box recorded for every clause.",
       requires: ["NUTRIENT_API_KEY"],
       credentialsPresent: nutrient,
@@ -98,9 +105,9 @@ export function modeReport(): ModeReport {
       key: "namecom",
       label: "name.com",
       role: "Registration and the DNS anchor",
-      supply: namecom ? "live" : "scripted",
+      supply: "scripted",
       detail: namecom
-        ? "Credentials present. The demo session does not spend money against them."
+        ? "Credentials present and unused here. Registrations return an order reference and buy nothing; no card is reachable from this session."
         : "Registrations return an order reference and buy nothing. No card is reachable from here.",
       requires: ["NAMECOM_USERNAME", "NAMECOM_TOKEN"],
       credentialsPresent: namecom,
@@ -111,7 +118,7 @@ export function modeReport(): ModeReport {
       role: "Diligence against the live world",
       supply: serpapi ? "live" : "scripted",
       detail: serpapi
-        ? "Trademark checks run against live search results, and a check that times out denies."
+        ? "Trademark checks run against live search results, and a check that times out denies rather than passes."
         : serpapiKey
           ? "Credentials present, live checks not requested. Set CHANCERY_LIVE_DILIGENCE=1 to run them; until then a local register extract of three entries answers, quoted in full on every finding."
           : "Trademark checks read a local register extract of three entries, quoted in full on every finding.",
@@ -124,7 +131,7 @@ export function modeReport(): ModeReport {
       role: "Registry, ledger and act history",
       supply: "scripted",
       detail: xano
-        ? "Credentials present. The demo session uses the in-process store so a reset costs nothing."
+        ? "Credentials present and unused here. MemoryWritStore holds the session, and builds the same hash chain the backend of record does."
         : "MemoryWritStore holds the session. It builds the same hash chain the backend of record does.",
       requires: ["XANO_BASE_URL", "XANO_TOKEN"],
       credentialsPresent: xano,
@@ -137,7 +144,7 @@ export function modeReport(): ModeReport {
     scriptedThroughout,
     headline: scriptedThroughout
       ? "Scripted session — no credentials configured"
-      : "Mixed session — some seams are live",
+      : "Credentials present, walkthrough still scripted",
     services,
   };
 }

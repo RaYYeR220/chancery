@@ -257,7 +257,12 @@ export class Chancery {
       request,
       history,
       diligence,
-      options: { allowUnauthenticatedDns: this.deps.allowUnauthenticatedDns },
+      // Normalised rather than passed through. The options object is hashed
+      // into the evidence bundle, and canonicalisation refuses an undefined
+      // property instead of dropping it — so an omitted dependency would make
+      // every decision throw rather than deny. It also has to default to
+      // false: an absent setting must not quietly relax the DNSSEC rule.
+      options: { allowUnauthenticatedDns: this.deps.allowUnauthenticatedDns === true },
       now,
     });
 

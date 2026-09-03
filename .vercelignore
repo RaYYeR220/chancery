@@ -1,0 +1,13 @@
+# Secrets are supplied as project environment variables, never uploaded.
+.env
+.env.*
+!.env.example
+
+# Local-only working material. Anchored to the root on purpose: an unanchored
+# pattern matches at any depth, and `xano/` would take src/lib/adapters/xano
+# with it.
+/ui-prototypes/
+/scratch/
+/xano/
+/tests/
+/.git/

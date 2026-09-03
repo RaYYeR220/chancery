@@ -200,6 +200,27 @@ function Answer({ answer }: { answer: VerifierAnswer }) {
               </div>
             </div>
 
+            <div className="slab">
+              <div className="slab__cap">
+                <span>Check this without us</span>
+                <span>no account, no key</span>
+              </div>
+              <div className="slab__body">
+                <p className="selfcheck__note">
+                  Everything above came out of one TXT lookup and one hash. Run the same two things
+                  yourself and compare:
+                </p>
+                <pre className="selfcheck mono">
+                  {`dig +dnssec TXT ${answer.name}\ncurl -sL ${answer.record?.url ?? "<u= from the record>"} | sha256sum`}
+                </pre>
+                <p className="selfcheck__note">
+                  {answer.source === "demo-zone"
+                    ? "This name is served by this deployment rather than by public DNS, so dig will answer NXDOMAIN for it. Any other name on this page is a real query and will answer the same for you as it did for us."
+                    : "This was a real query. A resolver you trust will give you the same answer, and if it does not, trust that one."}
+                </p>
+              </div>
+            </div>
+
             {answer.record !== null && (
               <div className={`slab`}>
                 <div className={`slab__cap ${cap}`}>
