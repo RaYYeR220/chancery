@@ -28,7 +28,7 @@ Chancery closes that gap. The thing the human reads and signs **is** the thing t
 ## What it does
 
 1. **Generate.** The writ is a real document with real terms — spend caps, allowlists, name patterns, expiry, jurisdiction, escalation thresholds — rendered with branching and computed totals rather than filled into a form letter.
-2. **Sign.** A human signs it. The agent cannot: nothing in the agent's process holds a signing credential, so an agent that tries gets an HTTP 401 from the signing service rather than a refusal from a prompt.
+2. **Sign.** A human signs it. The agent cannot: nothing in the agent's process holds a Foxit credential at all, so an agent that tries is refused by Foxit rather than by a prompt. `pnpm boundary` makes that happen live and prints what came back. We tested the obvious alternative — relying on the vendor to scope a PDF Services key away from eSign — and found it does not hold on a developer account, which is exactly why the boundary is about who holds a credential rather than what a credential is scoped to.
 3. **Read it back.** The signed PDF is parsed into machine-readable terms with a citation for every field. A term that did not ground in the page it came from is treated as **absent**, not as permissive.
 4. **Publish.** The document's hash, the agent's key and an expiry go into DNS as a `WRIT1` TXT record — the same place SPF, DKIM and CAA already live. Anyone can read it. Nobody has to ask us.
 5. **Enforce.** Every irreversible act re-resolves DNS, re-checks the document hash, re-runs due diligence against live web data, and returns ALLOW or DENY citing the clause and the page.
