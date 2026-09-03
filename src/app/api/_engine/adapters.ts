@@ -412,10 +412,17 @@ export class DemoResolver implements WritResolver {
       name,
       txtRecords: this.zone.read(name),
       resolver: SCRIPTED_RESOLVER,
-      // The zone is served in-process, so the answer cannot be tampered with in
-      // transit and the AD flag is reported as set. It is labelled as a scripted
-      // zone everywhere it appears, precisely so this is not read as DNSSEC.
-      authenticatedData: true,
+      // False, and it has to be. The AD flag means one specific thing — this
+      // answer was DNSSEC-validated — and an in-process zone has no chain to
+      // validate against. Reporting it as set because the answer happens to be
+      // trustworthy for a different reason would be the exact softening the
+      // product refuses everywhere else, and it would quietly carry the demo
+      // past the DNSSEC gate we advertise as failing closed.
+      //
+      // The demo therefore runs with `allowUnauthenticatedDns`, which every
+      // decision records in its own reasons. That is the honest shape: the gate
+      // still fires, and the relaxation is visible in the verdict.
+      authenticatedData: false,
       resolvedAt: this.clock(),
     };
   }

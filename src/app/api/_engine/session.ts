@@ -107,12 +107,16 @@ export class DemoSession {
       store: this.store,
       clock,
       documentBaseUrl: DOCUMENT_BASE_URL,
-      // Passed explicitly rather than left off. `Chancery.evaluate` copies this
-      // straight into the bundle's `options`, and `canonicalize` refuses a
-      // property that is present and undefined — so omitting it makes every
-      // `putEvidence` throw. Strict is the right value here anyway: the demo
-      // zone is served in process and reports AD set.
-      allowUnauthenticatedDns: false,
+      // True, and visibly so. The demo zone is served in process, so it has no
+      // DNSSEC chain and honestly reports no AD flag; the strict gate would
+      // therefore refuse every act before reaching anything interesting. The
+      // alternative — having the zone claim AD it does not have — would carry
+      // the demo past the gate by lying about it, which is worse than relaxing
+      // the gate on purpose.
+      //
+      // Relaxing it is recorded: every verdict produced under this flag carries
+      // a reason saying a strict verifier would have denied.
+      allowUnauthenticatedDns: true,
     });
   }
 

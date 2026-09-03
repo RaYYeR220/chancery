@@ -181,15 +181,25 @@ function matchFor(session: SessionView, stepIndex: number): boolean | null {
   );
 }
 
-/** The 401 at step two. The boundary is a missing credential, not a refusal message. */
+/**
+ * The refusal at step two, transcribed from a real call.
+ *
+ * This is not illustrative. It is what Foxit's gateway returns to a caller that
+ * holds no credential, recorded on 2026-09-03 and reproducible with
+ * `pnpm boundary` or the curl in PROOF.md. An invented transcript here would be
+ * the one place in the product where a vendor's response was fabricated, which
+ * is why it is copied rather than written.
+ */
 function Boundary() {
   return (
     <pre className="guide__wire mono">
-      {`POST /esign/v1/envelopes
-> authorization: (none — this process holds no signing credential)
+      {`POST https://na1.fusion.foxit.com/esign/api/v1/folders/createfolder
+> content-type: application/json
+> (no client_id, no client_secret — this process holds neither)
 
-HTTP/1.1 401 Unauthorized
-{"error":"missing_credentials"}`}
+HTTP/1.1 400 Bad Request
+{"allow":false,"reason":"Missing credentials: provide both
+ 'client_id' and 'client_secret' headers."}`}
     </pre>
   );
 }
