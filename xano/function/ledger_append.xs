@@ -12,7 +12,7 @@
 // The hash is computed in a lambda because XanoScript filters cannot express
 // RFC 8785 key ordering, and an ordering that differs from the TypeScript
 // canonicaliser by one character makes every entry unverifiable.
-function ledger_append {
+function "ledger_append" {
   description = "Append one entry to the tamper-evident chain."
 
   input {
@@ -27,32 +27,39 @@ function ledger_append {
         "act.failed"
       ]
     }
-    // ISO-8601, stored verbatim: this exact string is inside the hash.
     text at
     json payload
-    text? writ_id
-    int? principal_id
+    text? writ_id?
+    int? principal_id?
   }
 
   stack {
     db.transaction {
       stack {
-        db.query ledger {
-          sort = [{field: "sequence", order: "desc"}]
-          per_page = 1
-          // Serialises concurrent appends. Without it the chain forks under
-          // any concurrency at all, and a forked chain is not a chain.
-          lock = "update"
-        } as $tail
-
-        var $previous = $tail|first
+        db.query "ledger" {
+          sort = {sequence: "desc"}
+          return = {type: "single"}
+          lock = true
+        } as $previous
 
         // GENESIS_HASH: 64 hex zeroes is what a chain of length zero links to.
-        var $previous_hash = $previous == null
-          ? "0000000000000000000000000000000000000000000000000000000000000000"
-          : $previous.hash
+        var $previous_hash {
+          value = "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+        var $sequence {
+          value = 0
+        }
 
-        var $sequence = $previous == null ? 0 : $previous.sequence|add:1
+        conditional {
+          if ($previous != null) {
+            var.update $previous_hash {
+              value = $previous.hash
+            }
+            var.update $sequence {
+              value = $previous.sequence + 1
+            }
+          }
+        }
 
         api.lambda {
           timeout = 5
@@ -95,7 +102,7 @@ function ledger_append {
           `
         } as $hash
 
-        db.add ledger {
+        db.add "ledger" {
           data = {
             sequence: $sequence,
             previous_hash: $previous_hash,

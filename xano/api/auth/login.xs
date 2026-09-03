@@ -4,35 +4,39 @@
 // message and the same status. Distinguishing them turns the endpoint into a
 // membership oracle over the customer list, and a principal's email is exactly
 // the thing an attacker wants to confirm before phishing a signature out of them.
-//
-// Rate limited on the email, not only the IP: an attacker spraying one password
-// across many accounts from a rotating pool is the shape this catches.
-query auth/login verb=POST {
+query "auth/login" verb=POST {
   description = "Exchange credentials for a JWT."
+  api_group = "auth"
 
   input {
-    email email? filters=trim|lower
-    text password?
+    email email filters=trim|lower
+    text password
   }
 
   stack {
-    security.rate_limit {
-      key = ("login:" ~ $input.email)
-      max = 10
-      ttl = 900
-      error = "Too many attempts for that account. Try again later."
+    function.run "rate_guard" {
+      input = {path: "auth/login", max: 10, window_seconds: 900}
     }
 
-    db.get principal { field_name = "email" field_value = $input.email } as $principal
+    function.run "audit_append" {
+      input = {principal_id: null, method: "POST", path: "auth/login", ip: $env.$remote_ip, vars: {email: $input.email}, ledger_sequence: null}
+    }
+
+    db.get "principal" {
+      field_name = "email"
+      field_value = $input.email
+    } as $principal
+
     precondition ($principal != null) {
       error_type = "accessdenied"
       error = "Invalid credentials."
     }
 
-    security.validate_password {
-      password = $input.password
-      hash = $principal.password
+    security.check_password {
+      text_password = $input.password
+      hash_password = $principal.password
     } as $valid
+
     precondition ($valid == true) {
       error_type = "accessdenied"
       error = "Invalid credentials."
@@ -40,9 +44,9 @@ query auth/login verb=POST {
 
     security.create_auth_token {
       table = "principal"
+      id = $principal.id
       extras = {}
       expiration = 86400
-      id = $principal.id
     } as $authToken
   }
 

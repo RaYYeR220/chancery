@@ -23,11 +23,15 @@ table agent {
     text public_key filters=trim
   }
 
+  // (principal_id, domain) is unique: one agent per domain per principal. Two
+  // live writs on one name would make "which authority applies" ambiguous at
+  // the moment it matters most.
+  //
+  // The comment lives here rather than beside the entry it describes because
+  // XanoScript's parser rejects `//` anywhere inside an array literal.
   index = [
     {type: "primary", field: [{name: "id"}]}
     {type: "btree|unique", field: [{name: "uid", op: "asc"}]}
-    // One agent per domain per principal. Two live writs on one name would make
-    // "which authority applies" ambiguous at the moment it matters most.
     {type: "btree|unique", field: [{name: "principal_id", op: "asc"}, {name: "domain", op: "asc"}]}
     {type: "btree", field: [{name: "domain", op: "asc"}]}
   ]

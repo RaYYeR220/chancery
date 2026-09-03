@@ -35,11 +35,13 @@ table job {
     json? attempt_log
   }
 
+  // The last index is the claim query's exact shape: due, pending, oldest
+  // first. (Comments cannot appear inside an array literal, so it is described
+  // here rather than beside it.)
   index = [
     {type: "primary", field: [{name: "id"}]}
     {type: "btree|unique", field: [{name: "uid", op: "asc"}]}
     {type: "btree|unique", field: [{name: "kind", op: "asc"}, {name: "idempotency_key", op: "asc"}]}
-    // The claim query's exact shape: due, pending, oldest first.
     {type: "btree", field: [{name: "status", op: "asc"}, {name: "run_after", op: "asc"}]}
   ]
 }

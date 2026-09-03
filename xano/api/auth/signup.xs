@@ -4,54 +4,61 @@
 // any backend, and the free tier's own throughput cap is not a security control:
 // it is shared across the whole workspace, so a scripted signup flood would take
 // the entire product down rather than just being throttled.
-query auth/signup verb=POST {
+//
+// The audit row is written by an explicit call rather than by middleware.
+// Middleware is an Essential-plan feature — the Metadata API refuses a
+// `middleware` definition on free with "Please upgrade to access middleware" —
+// so the cross-cutting concern is a function every mutating endpoint calls.
+query "auth/signup" verb=POST {
   description = "Create a principal and issue a JWT."
+  api_group = "auth"
 
   input {
-    text legal_name? filters=trim
-    email email? filters=trim|lower
-    // Length is enforced by the column filter too; stating it here means a bad
-    // password is rejected before a row is attempted.
-    text password? filters=min:12
+    text legal_name filters=trim
+    email email filters=trim|lower
+    text password filters=min:12
   }
 
   stack {
-    security.rate_limit {
-      key = ("signup:" ~ $request.ip)
-      max = 5
-      ttl = 900
-      error = "Too many signup attempts. Try again later."
+    function.run "rate_guard" {
+      input = {path: "auth/signup", max: 5, window_seconds: 900}
     }
 
-    db.get principal { field_name = "email" field_value = $input.email } as $existing
+    function.run "audit_append" {
+      input = {principal_id: null, method: "POST", path: "auth/signup", ip: $env.$remote_ip, vars: {email: $input.email}, ledger_sequence: null}
+    }
+
+    db.get "principal" {
+      field_name = "email"
+      field_value = $input.email
+    } as $existing
+
     precondition ($existing == null) {
       error_type = "accessdenied"
       error = "That email already has a Chancery account."
     }
 
-    security.uuid {} as $uid
-    db.add principal {
+    security.create_uuid {
+    } as $uid
+
+    db.add "principal" {
       data = {
-        created_at: "now",
         uid: $uid,
         legal_name: $input.legal_name,
         email: $input.email,
         password: $input.password,
-        // Never settable from a request. It becomes true only when the
-        // diligence service corroborates the entity against live web data.
         entity_verified: false
       }
     } as $principal
 
     security.create_auth_token {
       table = "principal"
+      id = $principal.id
       extras = {}
       expiration = 86400
-      id = $principal.id
     } as $authToken
   }
 
-  // The password column is never in this shape, and neither is the row id.
   response = {
     authToken: $authToken,
     principal: {

@@ -212,7 +212,11 @@ export class XanoWritStore implements WritStore {
     domain: string,
     options: CallOptions = {},
   ): Promise<StoredWrit | null> {
-    const wire = await this.request<WireWrit | null>("GET", "/writ/by_domain", {
+    // `/writ_by_domain`, not `/writ/by_domain`: Xano resolves `writ/{writ_uid}`
+    // ahead of a literal sibling segment, so the nested spelling reached the
+    // by-uid endpoint with `writ_uid = "by_domain"` and died comparing a
+    // non-uuid to a `uuid` column.
+    const wire = await this.request<WireWrit | null>("GET", "/writ_by_domain", {
       ...options,
       query: { domain },
     });

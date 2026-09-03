@@ -12,42 +12,48 @@
 //
 // Clauses are inserted, never merged. A writ is drafted whole and then signed
 // whole; there is no partial amendment path anywhere in this API.
-query writ verb=POST {
+query "writ" verb=POST {
   description = "Draft a writ. Returns the assembled instrument, status `draft`."
+  api_group = "chancery"
+  auth = "principal"
 
   input {
-    text agent_external_id? filters=trim
-    text agent_label? filters=trim
-    text agent_domain? filters=trim|lower
-    text agent_public_key? filters=trim
-    timestamp effective_from?
-    timestamp expires_at?
-    text jurisdiction? filters=trim
-    // [{ ref, act_kind, limits, conditions }] — limits and conditions stored
-    // verbatim; see the note on `clause`.
-    json grants?
+    text agent_external_id filters=trim
+    text agent_label filters=trim
+    text agent_domain filters=trim|lower
+    text agent_public_key filters=trim
+    timestamp effective_from
+    timestamp expires_at
+    text jurisdiction filters=trim
+    json grants
   }
 
   stack {
+    function.run "audit_append" {
+      input = {principal_id: $auth.id, method: "POST", path: "writ", ip: $env.$remote_ip, vars: {agent_domain: $input.agent_domain}, ledger_sequence: null}
+    }
+
     precondition ($input.expires_at > $input.effective_from) {
-      error_type = "input"
+      error_type = "inputerror"
       error = "A writ cannot expire before it takes effect."
     }
-    precondition ($input.grants|count > 0) {
-      error_type = "input"
+
+    precondition (($input.grants|count) > 0) {
+      error_type = "inputerror"
       error = "A writ that grants nothing is not a writ."
     }
 
-    db.query agent {
-      where = ($db.agent.principal_id == $auth.id && $db.agent.domain == $input.agent_domain)
-      per_page = 1
-    } as $found
+    db.query "agent" {
+      where = $db.agent.principal_id == $auth.id && $db.agent.domain == $input.agent_domain
+      return = {type: "single"}
+    } as $agent
 
-    conditional ($found|count > 0) {
-      then { var $agent = $found|first }
-      else {
-        security.uuid {} as $agent_uid
-        db.add agent {
+    conditional {
+      if ($agent == null) {
+        security.create_uuid {
+        } as $agent_uid
+
+        db.add "agent" {
           data = {
             uid: $agent_uid,
             principal_id: $auth.id,
@@ -56,12 +62,18 @@ query writ verb=POST {
             domain: $input.agent_domain,
             public_key: $input.agent_public_key
           }
-        } as $agent
+        } as $created_agent
+
+        var.update $agent {
+          value = $created_agent
+        }
       }
     }
 
-    security.uuid {} as $writ_uid
-    db.add writ {
+    security.create_uuid {
+    } as $writ_uid
+
+    db.add "writ" {
       data = {
         uid: $writ_uid,
         principal_id: $auth.id,
@@ -74,22 +86,32 @@ query writ verb=POST {
       }
     } as $writ
 
-    var $ordinal = 0
-    for_each ($input.grants as $grant) {
-      db.add clause {
-        data = {
-          writ_id: $writ.id,
-          ref: $grant.ref,
-          act_kind: $grant.act_kind,
-          limits: $grant.limits,
-          conditions: $grant.conditions,
-          ordinal: $ordinal
-        }
-      }
-      var $ordinal = $ordinal|add:1
+    var $ordinal {
+      value = 0
     }
 
-    function.writ_assemble { writ_id = $writ.id } as $assembled
+    foreach ($input.grants) {
+      each as $grant {
+        db.add "clause" {
+          data = {
+            writ_id: $writ.id,
+            ref: $grant.ref,
+            act_kind: $grant.act_kind,
+            limits: $grant.limits,
+            conditions: $grant.conditions,
+            ordinal: $ordinal
+          }
+        }
+
+        var.update $ordinal {
+          value = $ordinal + 1
+        }
+      }
+    }
+
+    function.run "writ_assemble" {
+      input = {writ_id: $writ.id}
+    } as $assembled
   }
 
   response = $assembled

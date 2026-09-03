@@ -7,31 +7,33 @@
 //
 // For an act the key is the act's uid, so the trigger can fire twice (a
 // re-delivery, a replayed transaction) and the domain is still bought once.
-function job_enqueue {
+function "job_enqueue" {
   description = "Enqueue durable work, at most once per idempotency key."
 
   input {
     text kind
     text idempotency_key
     json payload
-    int? max_attempts
-    // Seconds to hold the job before its first attempt.
-    int? delay_seconds
+    int? max_attempts?
+    int? delay_seconds?
   }
 
   stack {
-    db.query job {
-      where = ($db.job.kind == $input.kind && $db.job.idempotency_key == $input.idempotency_key)
-      per_page = 1
+    db.query "job" {
+      where = $db.job.kind == $input.kind && $db.job.idempotency_key == $input.idempotency_key
+      return = {type: "single"}
     } as $existing
 
-    conditional ($existing|count > 0) {
-      then {
-        var $job = $existing|first
-      }
-      else {
-        security.uuid {} as $uid
-        db.add job {
+    var $job {
+      value = $existing
+    }
+
+    conditional {
+      if ($existing == null) {
+        security.create_uuid {
+        } as $uid
+
+        db.add "job" {
           data = {
             uid: $uid,
             kind: $input.kind,
@@ -39,14 +41,23 @@ function job_enqueue {
             payload: $input.payload,
             status: "pending",
             attempts: 0,
-            max_attempts: $input.max_attempts|default:6,
-            run_after: "now"|add_seconds:($input.delay_seconds|default:0),
+            max_attempts: ($input.max_attempts|first_notnull:6),
+            run_after: ((now|to_ms) + (($input.delay_seconds|first_notnull:0) * 1000)),
             attempt_log: []
           }
-        } as $job
+        } as $created
+
+        var.update $job {
+          value = $created
+        }
       }
     }
   }
 
-  response = { id: $job.id, uid: $job.uid, status: $job.status, created: $existing|count == 0 }
+  response = {
+    id: $job.id,
+    uid: $job.uid,
+    status: $job.status,
+    created: $existing == null
+  }
 }

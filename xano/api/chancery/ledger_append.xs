@@ -6,15 +6,17 @@
 // would compute the same next number and one would be rejected by the unique
 // index after its payload had already been accepted.
 //
-// So the chain is assigned here, under the lock `ledger_append` takes, and
+// So the chain is assigned by `ledger_append`, under the lock it takes, and
 // verified on the way back out by the client against the same canonical form.
 // Server-assigned and client-verified is the whole claim — an entry the caller
 // cannot reproduce is not evidence and the client refuses it.
-query ledger verb=POST {
+query "ledger" verb=POST {
   description = "Append one entry to the tamper-evident chain."
+  api_group = "chancery"
+  auth = "principal"
 
   input {
-    enum kind? {
+    enum kind {
       values = [
         "writ.issued",
         "writ.anchored",
@@ -25,29 +27,30 @@ query ledger verb=POST {
         "act.failed"
       ]
     }
-    text at?
-    json payload?
-    // Denormalised for scoping only. Verified below rather than trusted: a
-    // caller could otherwise file an entry under someone else's writ and make
-    // their audit trail say something it should not.
-    text? writ_id
+    text at
+    json payload
+    text? writ_id?
   }
 
   stack {
-    conditional ($input.writ_id != null) {
-      then {
-        function.writ_owned { writ_uid = $input.writ_id } as $writ
-        var $writ_uid = $writ.uid
-      }
-      else { var $writ_uid = null }
+    var $writ_uid {
+      value = null
     }
 
-    function.ledger_append {
-      kind = $input.kind
-      at = $input.at
-      payload = $input.payload
-      writ_id = $writ_uid
-      principal_id = $auth.id
+    conditional {
+      if ($input.writ_id != null) {
+        function.run "writ_owned" {
+          input = {writ_uid: $input.writ_id, required: true}
+        } as $writ
+
+        var.update $writ_uid {
+          value = $writ.uid
+        }
+      }
+    }
+
+    function.run "ledger_append" {
+      input = {kind: $input.kind, at: $input.at, payload: $input.payload, writ_id: $writ_uid, principal_id: $auth.id}
     } as $entry
   }
 

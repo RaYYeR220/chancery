@@ -26,12 +26,13 @@ table webhook_request {
     timestamp? processed_at
   }
 
+  // Idempotent replay handling lives in the unique (source_id, delivery_id)
+  // index: the provider retries until it sees a 200, and that index is what
+  // makes the second delivery a lookup instead of a second signature.
+  // (Comments cannot appear inside an array literal.)
   index = [
     {type: "primary", field: [{name: "id"}]}
     {type: "btree|unique", field: [{name: "uid", op: "asc"}]}
-    // Idempotent replay handling lives here: the provider retries until it sees
-    // a 200, and this index is what makes the second delivery a lookup instead
-    // of a second signature.
     {type: "btree|unique", field: [{name: "source_id", op: "asc"}, {name: "delivery_id", op: "asc"}]}
     {type: "btree", field: [{name: "status", op: "asc"}, {name: "created_at", op: "asc"}]}
   ]

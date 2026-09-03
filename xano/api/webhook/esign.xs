@@ -16,126 +16,106 @@
 // it is verified, so a forged callback claiming a writ was signed leaves a
 // record of the attempt — which is exactly the attack this product exists to
 // stop, and the evidence is worth more than the row costs.
-query esign verb=POST {
+//
+// `raw_body` holds the canonical re-serialisation of the parsed body, not the
+// bytes as they arrived: XanoScript exposes no raw-body variable. See
+// `webhook_verify` and the README for what that costs and why it is stated
+// rather than papered over.
+query "esign" verb=POST {
   description = "Accept an eSign completion callback. Persist, verify, queue, 200."
+  api_group = "webhook"
 
   input {
-    json body?
+    json body
+    text? signature?
+    text? delivery_id?
+    text? sent_at?
   }
 
   stack {
-    db.get webhook_source { field_name = "slug" field_value = "foxit-esign" } as $source
+    db.get "webhook_source" {
+      field_name = "slug"
+      field_value = "foxit-esign"
+    } as $source
+
     precondition ($source != null && $source.active == true) {
       error_type = "notfound"
       error = "Unknown webhook source."
     }
 
-    // Raw bytes, never the re-serialised object: re-serialising reorders keys
-    // and the HMAC stops matching, which presents as "the provider's signatures
-    // are wrong" and costs a day.
-    var $raw = $http.raw_body
-    var $signature = $http.headers|get:$source.signature_header|default:""
-    var $delivery_id = $source.delivery_id_header == null
-      ? null
-      : $http.headers|get:$source.delivery_id_header
-    var $timestamp = $source.timestamp_header == null
-      ? null
-      : $http.headers|get:$source.timestamp_header
+    security.create_uuid {
+    } as $uid
 
-    security.uuid {} as $uid
-
-    // Persisted before verification. See the header note.
-    db.add webhook_request {
+    db.add "webhook_request" {
       data = {
         uid: $uid,
         source_id: $source.id,
-        delivery_id: $delivery_id,
-        signature: $signature,
+        delivery_id: $input.delivery_id,
+        signature: ($input.signature|first_notnull:""),
         verified: false,
         status: "received",
-        // Only the headers that matter. Copying them all would put the
-        // provider's own bearer tokens into a table we hand to support.
-        headers: {
-          signature_header: $source.signature_header,
-          delivery_id: $delivery_id,
-          timestamp: $timestamp,
-          content_type: $http.headers|get:"content-type"
-        },
-        raw_body: $raw
+        headers: {content_type: "application/json", delivery_id: $input.delivery_id, sent_at: $input.sent_at},
+        raw_body: ($input.body|json_encode)
       }
     } as $request
 
-    function.webhook_verify {
-      slug = $source.slug
-      raw_body = $raw
-      signature = $signature
-      timestamp = $timestamp
-      tolerance_seconds = $source.tolerance_seconds
-      algo = $source.algo
+    function.run "webhook_verify" {
+      input = {slug: $source.slug, body: $input.body, signature: ($input.signature|first_notnull:""), timestamp: $input.sent_at, tolerance_seconds: $source.tolerance_seconds, algo: $source.algo}
     } as $check
 
-    conditional ($check.verified != true) {
-      then {
-        db.edit webhook_request {
+    conditional {
+      if ($check.verified != true) {
+        db.edit "webhook_request" {
           field_name = "id"
           field_value = $request.id
-          data = { status: "rejected", error: "signature verification failed" }
+          data = {
+            status: "rejected",
+            error: "signature verification failed"
+          }
         }
-        throw { error_type = "accessdenied" error = "Signature verification failed." }
+
+        throw {
+          name = "SignatureError"
+          value = "Signature verification failed."
+        }
       }
     }
 
-    db.edit webhook_request {
-      field_name = "id"
-      field_value = $request.id
-      data = { verified: true }
-    }
+    db.query "webhook_request" {
+      where = $db.webhook_request.source_id == $source.id && $db.webhook_request.delivery_id == $input.delivery_id && $db.webhook_request.id != $request.id && $db.webhook_request.verified == true
+      return = {type: "exists"}
+    } as $replayed
 
-    // Idempotent replay handling. The provider retries until it sees a 200, so
-    // the same delivery WILL arrive more than once — that is correct behaviour
-    // on their side, and it has to be a lookup here rather than a second
-    // activation of the same envelope.
-    conditional ($delivery_id != null) {
-      then {
-        db.query webhook_request {
-          where = (
-            $db.webhook_request.source_id == $source.id
-            && $db.webhook_request.delivery_id == $delivery_id
-            && $db.webhook_request.id != $request.id
-            && $db.webhook_request.verified == true
-          )
-          per_page = 1
-        } as $prior
-      }
-      else { var $prior = [] }
-    }
-
-    conditional ($prior|count > 0) {
-      then {
-        db.edit webhook_request {
+    conditional {
+      if ($replayed == true) {
+        db.edit "webhook_request" {
           field_name = "id"
           field_value = $request.id
-          data = { status: "replayed" }
+          data = {
+            verified: true,
+            status: "replayed"
+          }
         }
       }
       else {
-        function.job_enqueue {
-          kind = "webhook.esign"
-          // The provider's delivery id when they send one; ours otherwise. Either
-          // way the work runs once.
-          idempotency_key = $delivery_id|default:$uid
-          payload = { webhook_request_id: $request.id }
+        function.run "job_enqueue" {
+          input = {kind: "webhook.esign", idempotency_key: ($input.delivery_id|first_notnull:$uid), payload: {webhook_request_id: $request.id}, max_attempts: 6, delay_seconds: 0}
         }
-        db.edit webhook_request {
+
+        db.edit "webhook_request" {
           field_name = "id"
           field_value = $request.id
-          data = { status: "queued" }
+          data = {
+            verified: true,
+            status: "queued"
+          }
         }
       }
     }
   }
 
-  // 200 with an acknowledgement and nothing else. The provider does not need to
-  // know what we will do with it, and telling them shapes a forger's next try.
-  response = { received: true, request_id: $uid }
+  response = {
+    received: true,
+    request_id: $uid
+  }
 }

@@ -8,20 +8,24 @@
 // The bundle holds the document HASH, never the document. A writ names a
 // principal and what they will spend; publishing the instrument is the
 // principal's decision, not ours.
-query receipt/{digest} verb=GET {
+query "receipt/{digest}" verb=GET {
   description = "One published evidence bundle, by content address."
+  api_group = "public"
 
   input {
     text digest
   }
 
   stack {
-    db.query receipt {
-      where = ($db.receipt.digest == $input.digest)
-      per_page = 1
-    } as $rows
-    var $receipt = $rows|first
-    precondition ($receipt != null) { error_type = "notfound" error = "No such receipt." }
+    db.query "receipt" {
+      where = $db.receipt.digest == $input.digest
+      return = {type: "single"}
+    } as $receipt
+
+    precondition ($receipt != null) {
+      error_type = "notfound"
+      error = "No such receipt."
+    }
   }
 
   response = {

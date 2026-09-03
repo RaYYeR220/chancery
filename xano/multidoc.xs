@@ -55,11 +55,15 @@ table agent {
     text public_key filters=trim
   }
 
+  // (principal_id, domain) is unique: one agent per domain per principal. Two
+  // live writs on one name would make "which authority applies" ambiguous at
+  // the moment it matters most.
+  //
+  // The comment lives here rather than beside the entry it describes because
+  // XanoScript's parser rejects `//` anywhere inside an array literal.
   index = [
     {type: "primary", field: [{name: "id"}]}
     {type: "btree|unique", field: [{name: "uid", op: "asc"}]}
-    // One agent per domain per principal. Two live writs on one name would make
-    // "which authority applies" ambiguous at the moment it matters most.
     {type: "btree|unique", field: [{name: "principal_id", op: "asc"}, {name: "domain", op: "asc"}]}
     {type: "btree", field: [{name: "domain", op: "asc"}]}
   ]
@@ -103,12 +107,13 @@ table writ {
     int consumed_minor_units?=0
   }
 
+  // The (status, expires_at) index is the sweep task's exact scan; without it
+  // expiry becomes a full table scan every hour forever. (The note sits above
+  // the block because XanoScript rejects `//` inside an array literal.)
   index = [
     {type: "primary", field: [{name: "id"}]}
     {type: "btree|unique", field: [{name: "uid", op: "asc"}]}
     {type: "btree", field: [{name: "principal_id", op: "asc"}]}
-    // The sweep task scans exactly this pair; without it, expiry becomes a full
-    // table scan every hour forever.
     {type: "btree", field: [{name: "status", op: "asc"}, {name: "expires_at", op: "asc"}]}
     {type: "btree", field: [{name: "agent_id", op: "asc"}, {name: "created_at", op: "desc"}]}
   ]
@@ -225,9 +230,10 @@ table receipt {
     enum outcome { values = ["allow", "deny"] }
   }
 
+  // The idempotency of `putEvidence` rests entirely on the unique index over
+  // `digest`. (Comments cannot appear inside an array literal.)
   index = [
     {type: "primary", field: [{name: "id"}]}
-    // The idempotency of `putEvidence` rests entirely on this index.
     {type: "btree|unique", field: [{name: "digest", op: "asc"}]}
     {type: "btree", field: [{name: "writ_id", op: "asc"}, {name: "created_at", op: "desc"}]}
   ]
@@ -388,11 +394,13 @@ table job {
     json? attempt_log
   }
 
+  // The last index is the claim query's exact shape: due, pending, oldest
+  // first. (Comments cannot appear inside an array literal, so it is described
+  // here rather than beside it.)
   index = [
     {type: "primary", field: [{name: "id"}]}
     {type: "btree|unique", field: [{name: "uid", op: "asc"}]}
     {type: "btree|unique", field: [{name: "kind", op: "asc"}, {name: "idempotency_key", op: "asc"}]}
-    // The claim query's exact shape: due, pending, oldest first.
     {type: "btree", field: [{name: "status", op: "asc"}, {name: "run_after", op: "asc"}]}
   ]
 }
@@ -495,12 +503,13 @@ table webhook_request {
     timestamp? processed_at
   }
 
+  // Idempotent replay handling lives in the unique (source_id, delivery_id)
+  // index: the provider retries until it sees a 200, and that index is what
+  // makes the second delivery a lookup instead of a second signature.
+  // (Comments cannot appear inside an array literal.)
   index = [
     {type: "primary", field: [{name: "id"}]}
     {type: "btree|unique", field: [{name: "uid", op: "asc"}]}
-    // Idempotent replay handling lives here: the provider retries until it sees
-    // a 200, and this index is what makes the second delivery a lookup instead
-    // of a second signature.
     {type: "btree|unique", field: [{name: "source_id", op: "asc"}, {name: "delivery_id", op: "asc"}]}
     {type: "btree", field: [{name: "status", op: "asc"}, {name: "created_at", op: "asc"}]}
   ]
@@ -521,7 +530,7 @@ table webhook_request {
 // The hash is computed in a lambda because XanoScript filters cannot express
 // RFC 8785 key ordering, and an ordering that differs from the TypeScript
 // canonicaliser by one character makes every entry unverifiable.
-function ledger_append {
+function "ledger_append" {
   description = "Append one entry to the tamper-evident chain."
 
   input {
@@ -536,75 +545,46 @@ function ledger_append {
         "act.failed"
       ]
     }
-    // ISO-8601, stored verbatim: this exact string is inside the hash.
     text at
     json payload
-    text? writ_id
-    int? principal_id
+    text? writ_id?
+    int? principal_id?
   }
 
   stack {
     db.transaction {
       stack {
-        db.query ledger {
-          sort = [{field: "sequence", order: "desc"}]
-          per_page = 1
-          // Serialises concurrent appends. Without it the chain forks under
-          // any concurrency at all, and a forked chain is not a chain.
-          lock = "update"
-        } as $tail
-
-        var $previous = $tail|first
+        db.query "ledger" {
+          sort = {sequence: "desc"}
+          return = {type: "single"}
+          lock = true
+        } as $previous
 
         // GENESIS_HASH: 64 hex zeroes is what a chain of length zero links to.
-        var $previous_hash = $previous == null
-          ? "0000000000000000000000000000000000000000000000000000000000000000"
-          : $previous.hash
+        var $previous_hash {
+          value = "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+        var $sequence {
+          value = 0
+        }
 
-        var $sequence = $previous == null ? 0 : $previous.sequence|add:1
+        conditional {
+          if ($previous != null) {
+            var.update $previous_hash {
+              value = $previous.hash
+            }
+            var.update $sequence {
+              value = $previous.sequence + 1
+            }
+          }
+        }
 
         api.lambda {
           timeout = 5
-          code = `
-            const crypto = require('crypto');
-
-            // RFC 8785 in the subset src/lib/core/canonical.ts implements: keys
-            // sorted by UTF-16 code unit, no insignificant whitespace, and a
-            // hard refusal on values JSON cannot round-trip rather than JSON's
-            // silent coercions. A hash over silently-dropped data is worse than
-            // an error.
-            function canon(value) {
-              if (value === null) return 'null';
-              const kind = typeof value;
-              if (kind === 'boolean') return value ? 'true' : 'false';
-              if (kind === 'number') {
-                if (!Number.isFinite(value)) throw new Error('non-finite number cannot be hashed');
-                return Object.is(value, -0) ? '0' : JSON.stringify(value);
-              }
-              if (kind === 'string') return JSON.stringify(value);
-              if (kind === 'undefined') throw new Error('undefined cannot be hashed');
-              if (Array.isArray(value)) return '[' + value.map(canon).join(',') + ']';
-              const keys = Object.keys(value).sort();
-              return '{' + keys.map(function (k) {
-                if (value[k] === undefined) throw new Error('undefined property ' + k);
-                return JSON.stringify(k) + ':' + canon(value[k]);
-              }).join(',') + '}';
-            }
-
-            // The sequence is inside the hash, so an entry cannot be silently
-            // moved to a different position in the chain.
-            const body = {
-              sequence: $var.sequence,
-              previousHash: $var.previous_hash,
-              kind: $input.kind,
-              at: $input.at,
-              payload: $input.payload
-            };
-            return crypto.createHash('sha256').update(canon(body), 'utf8').digest('hex');
-          `
+          code = "const crypto = require('crypto');\n\n// RFC 8785 in the subset src/lib/core/canonical.ts implements: keys\n// sorted by UTF-16 code unit, no insignificant whitespace, and a\n// hard refusal on values JSON cannot round-trip rather than JSON's\n// silent coercions. A hash over silently-dropped data is worse than\n// an error.\nfunction canon(value) {\n  if (value === null) return 'null';\n  const kind = typeof value;\n  if (kind === 'boolean') return value ? 'true' : 'false';\n  if (kind === 'number') {\n    if (!Number.isFinite(value)) throw new Error('non-finite number cannot be hashed');\n    return Object.is(value, -0) ? '0' : JSON.stringify(value);\n  }\n  if (kind === 'string') return JSON.stringify(value);\n  if (kind === 'undefined') throw new Error('undefined cannot be hashed');\n  if (Array.isArray(value)) return '[' + value.map(canon).join(',') + ']';\n  const keys = Object.keys(value).sort();\n  return '{' + keys.map(function (k) {\n    if (value[k] === undefined) throw new Error('undefined property ' + k);\n    return JSON.stringify(k) + ':' + canon(value[k]);\n  }).join(',') + '}';\n}\n\n// The sequence is inside the hash, so an entry cannot be silently\n// moved to a different position in the chain.\nconst body = {\n  sequence: $var.sequence,\n  previousHash: $var.previous_hash,\n  kind: $input.kind,\n  at: $input.at,\n  payload: $input.payload\n};\nreturn crypto.createHash('sha256').update(canon(body), 'utf8').digest('hex');"
         } as $hash
 
-        db.add ledger {
+        db.add "ledger" {
           data = {
             sequence: $sequence,
             previous_hash: $previous_hash,
@@ -631,37 +611,44 @@ function ledger_append {
 }
 ---
 // function/audit_append.xs
-// Write one access-log row. Called by the `audit_mutation` middleware.
+// Write one access-log row.
 //
-// Kept as a function rather than inlined so the middleware stays readable and so
-// the task workers — which mutate the same tables outside any request — can call
-// it with the same shape.
-function audit_append {
+// Kept as a function rather than inlined so every mutating endpoint records the
+// call the same way, and so the task workers — which mutate the same tables
+// outside any request — can call it with the same shape.
+//
+// This would be middleware if middleware were available. It is not: the
+// Metadata API rejects a `middleware` definition on the free plan with
+// "Please upgrade to access middleware", so the cross-cutting concern is a
+// function every mutating endpoint calls explicitly. See the README.
+function "audit_append" {
   description = "Record a mutating call against the principal that made it."
 
   input {
-    int? principal_id
+    int? principal_id?
     text method
     text path
-    text? ip
-    json? vars
-    int? ledger_sequence
+    text? ip?
+    json? vars?
+    int? ledger_sequence?
   }
 
   stack {
-    db.add audit {
+    db.add "audit" {
       data = {
         principal_id: $input.principal_id,
         method: $input.method,
         path: $input.path,
         ip: $input.ip,
-        vars: $input.vars|default:{},
+        vars: $input.vars,
         ledger_sequence: $input.ledger_sequence
       }
     } as $row
   }
 
-  response = { id: $row.id }
+  response = {
+    id: $row.id
+  }
 }
 ---
 // function/writ_assemble.xs
@@ -673,11 +660,12 @@ function audit_append {
 // path assembles the instrument, so there is exactly one shape a consumer ever
 // sees and exactly one place to change it.
 //
-// Timestamps go out as ISO-8601 strings. Xano returns `timestamp` columns as
-// epoch milliseconds by default; the decision engine compares dates as strings,
-// so the formatting happens here rather than being left to whichever client
-// remembered.
-function writ_assemble {
+// Timestamps go out as the raw epoch-millisecond column values rather than
+// formatted strings. XanoScript's `format_timestamp` needs escaped literals to
+// emit ISO-8601 and every escape is a chance to silently produce a date the
+// engine cannot parse; the TypeScript adapter already normalises epoch millis to
+// ISO on the way in, so the conversion happens once, in the place that has tests.
+function "writ_assemble" {
   description = "Assemble a StoredWrit from writ + principal + agent + clauses."
 
   input {
@@ -685,25 +673,41 @@ function writ_assemble {
   }
 
   stack {
-    db.get writ { field_name = "id" field_value = $input.writ_id } as $writ
-    precondition ($writ != null) { error_type = "notfound" error = "No such writ." }
+    db.get "writ" {
+      field_name = "id"
+      field_value = $input.writ_id
+    } as $writ
 
-    db.get principal { field_name = "id" field_value = $writ.principal_id } as $principal
-    db.get agent { field_name = "id" field_value = $writ.agent_id } as $agent
+    precondition ($writ != null) {
+      error_type = "notfound"
+      error = "No such writ."
+    }
 
-    db.query clause {
-      where = ($db.clause.writ_id == $writ.id)
-      sort = [{field: "ordinal", order: "asc"}, {field: "id", order: "asc"}]
-      per_page = 200
+    db.get "principal" {
+      field_name = "id"
+      field_value = $writ.principal_id
+    } as $principal
+
+    db.get "agent" {
+      field_name = "id"
+      field_value = $writ.agent_id
+    } as $agent
+
+    db.query "clause" {
+      where = $db.clause.writ_id == $writ.id
+      sort = {ordinal: "asc"}
+      return = {type: "list"}
     } as $clauses
 
-    var $grants = []
-    for_each ($clauses as $clause) {
-      var $grants = $grants|array_push:{
-        ref: $clause.ref,
-        act_kind: $clause.act_kind,
-        limits: $clause.limits,
-        conditions: $clause.conditions
+    var $grants {
+      value = []
+    }
+
+    foreach ($clauses) {
+      each as $clause {
+        var.update $grants {
+          value = $grants|push:{ref: $clause.ref, act_kind: $clause.act_kind, limits: $clause.limits, conditions: $clause.conditions}
+        }
       }
     }
   }
@@ -725,15 +729,15 @@ function writ_assemble {
         public_key: $agent.public_key
       },
       grants: $grants,
-      effective_from: $writ.effective_from|to_iso8601,
-      expires_at: $writ.expires_at|to_iso8601,
+      effective_from: $writ.effective_from,
+      expires_at: $writ.expires_at,
       jurisdiction: $writ.jurisdiction
     },
     document_url: $writ.document_url,
     document_sha256: $writ.document_sha256,
     envelope_id: $writ.envelope_id,
     policy: $writ.policy,
-    anchored_at: $writ.anchored_at == null ? null : $writ.anchored_at|to_iso8601
+    anchored_at: $writ.anchored_at
   }
 }
 ---
@@ -749,23 +753,19 @@ function writ_assemble {
 // A writ belonging to someone else is reported as absent, not as forbidden.
 // "403" on another principal's uid confirms that the uid exists, which is a
 // membership oracle over the whole registry.
-function writ_owned {
+function "writ_owned" {
   description = "Look up a writ by uid, scoped to the authenticated principal."
 
   input {
     text writ_uid
-    // When false the caller gets null instead of an error, for the read paths
-    // where "no such writ" is an answer rather than a failure.
-    bool required?=true
+    bool required
   }
 
   stack {
-    db.query writ {
-      where = ($db.writ.uid == $input.writ_uid && $db.writ.principal_id == $auth.id)
-      per_page = 1
-    } as $rows
-
-    var $writ = $rows|first
+    db.query "writ" {
+      where = $db.writ.uid == $input.writ_uid && $db.writ.principal_id == $auth.id
+      return = {type: "single"}
+    } as $writ
 
     precondition ($writ != null || $input.required == false) {
       error_type = "notfound"
@@ -786,31 +786,33 @@ function writ_owned {
 //
 // For an act the key is the act's uid, so the trigger can fire twice (a
 // re-delivery, a replayed transaction) and the domain is still bought once.
-function job_enqueue {
+function "job_enqueue" {
   description = "Enqueue durable work, at most once per idempotency key."
 
   input {
     text kind
     text idempotency_key
     json payload
-    int? max_attempts
-    // Seconds to hold the job before its first attempt.
-    int? delay_seconds
+    int? max_attempts?
+    int? delay_seconds?
   }
 
   stack {
-    db.query job {
-      where = ($db.job.kind == $input.kind && $db.job.idempotency_key == $input.idempotency_key)
-      per_page = 1
+    db.query "job" {
+      where = $db.job.kind == $input.kind && $db.job.idempotency_key == $input.idempotency_key
+      return = {type: "single"}
     } as $existing
 
-    conditional ($existing|count > 0) {
-      then {
-        var $job = $existing|first
-      }
-      else {
-        security.uuid {} as $uid
-        db.add job {
+    var $job {
+      value = $existing
+    }
+
+    conditional {
+      if ($existing == null) {
+        security.create_uuid {
+        } as $uid
+
+        db.add "job" {
           data = {
             uid: $uid,
             kind: $input.kind,
@@ -818,16 +820,25 @@ function job_enqueue {
             payload: $input.payload,
             status: "pending",
             attempts: 0,
-            max_attempts: $input.max_attempts|default:6,
-            run_after: "now"|add_seconds:($input.delay_seconds|default:0),
+            max_attempts: ($input.max_attempts|first_notnull:6),
+            run_after: ((now|to_ms) + (($input.delay_seconds|first_notnull:0) * 1000)),
             attempt_log: []
           }
-        } as $job
+        } as $created
+
+        var.update $job {
+          value = $created
+        }
       }
     }
   }
 
-  response = { id: $job.id, uid: $job.uid, status: $job.status, created: $existing|count == 0 }
+  response = {
+    id: $job.id,
+    uid: $job.uid,
+    status: $job.status,
+    created: $existing == null
+  }
 }
 ---
 // function/job_claim.xs
@@ -843,44 +854,56 @@ function job_enqueue {
 // workers cannot lease the same job. `run_after <= now` is the whole backoff
 // mechanism: a failed job writes its next attempt into the future and simply
 // stops matching this query until then.
-function job_claim {
+function "job_claim" {
   description = "Lease up to `limit` due jobs of one kind."
 
   input {
     text kind
-    int? limit
+    int? limit?
   }
 
   stack {
-    security.uuid {} as $claim_token
+    security.create_uuid {
+    } as $claim_token
+
+    var $claimed {
+      value = []
+    }
 
     db.transaction {
       stack {
-        db.query job {
-          where = (
-            $db.job.kind == $input.kind
-            && $db.job.status == "pending"
-            && $db.job.run_after <= "now"
-          )
-          sort = [{field: "run_after", order: "asc"}, {field: "id", order: "asc"}]
-          per_page = $input.limit|default:10
-          lock = "update|skip_locked"
+        db.query "job" {
+          where = $db.job.kind == $input.kind && $db.job.status == "pending" && $db.job.run_after <= now
+          sort = {run_after: "asc"}
+          lock = true
+          return = {type: "list", paging: {page: 1, per_page: ($input.limit|first_notnull:10)}}
         } as $due
 
-        var $claimed = []
-        for_each ($due as $job) {
-          db.edit job {
-            field_name = "id"
-            field_value = $job.id
-            data = { status: "claimed", claimed_at: "now", claim_token: $claim_token }
-          } as $updated
-          var $claimed = $claimed|array_push:$updated
+        foreach ($due) {
+          each as $job {
+            db.edit "job" {
+              field_name = "id"
+              field_value = $job.id
+              data = {
+                status: "claimed",
+                claimed_at: now,
+                claim_token: $claim_token
+              }
+            } as $updated
+
+            var.update $claimed {
+              value = $claimed|push:$updated
+            }
+          }
         }
       }
     }
   }
 
-  response = { claim_token: $claim_token, jobs: $claimed }
+  response = {
+    claim_token: $claim_token,
+    jobs: $claimed
+  }
 }
 ---
 // function/job_complete.xs
@@ -889,7 +912,7 @@ function job_claim {
 // The claim token is checked, not just the id. A worker whose lease was already
 // reaped and whose job was handed to somebody else must not be able to mark it
 // done from under them — that is how a job runs twice and reports success once.
-function job_complete {
+function "job_complete" {
   description = "Release a leased job as done."
 
   input {
@@ -898,21 +921,37 @@ function job_complete {
   }
 
   stack {
-    db.get job { field_name = "id" field_value = $input.job_id } as $job
-    precondition ($job != null) { error_type = "notfound" error = "No such job." }
+    db.get "job" {
+      field_name = "id"
+      field_value = $input.job_id
+    } as $job
+
+    precondition ($job != null) {
+      error_type = "notfound"
+      error = "No such job."
+    }
+
     precondition ($job.claim_token == $input.claim_token) {
       error_type = "accessdenied"
       error = "This lease is no longer held."
     }
 
-    db.edit job {
+    db.edit "job" {
       field_name = "id"
       field_value = $job.id
-      data = { status: "done", completed_at: "now", claim_token: null, last_error: null }
+      data = {
+        status: "done",
+        completed_at: now,
+        claim_token: null,
+        last_error: null
+      }
     } as $done
   }
 
-  response = { id: $done.id, status: $done.status }
+  response = {
+    id: $done.id,
+    status: $done.status
+  }
 }
 ---
 // function/job_fail.xs
@@ -929,7 +968,7 @@ function job_complete {
 // failed six times over an hour is not a transient failure, and this product's
 // entire posture is that a machine does not decide on its own to try an
 // irreversible thing again.
-function job_fail {
+function "job_fail" {
   description = "Record a failed attempt, back off, or dead-letter."
 
   input {
@@ -939,23 +978,36 @@ function job_fail {
   }
 
   stack {
-    db.get job { field_name = "id" field_value = $input.job_id } as $job
-    precondition ($job != null) { error_type = "notfound" error = "No such job." }
+    db.get "job" {
+      field_name = "id"
+      field_value = $input.job_id
+    } as $job
+
+    precondition ($job != null) {
+      error_type = "notfound"
+      error = "No such job."
+    }
+
     precondition ($job.claim_token == $input.claim_token) {
       error_type = "accessdenied"
       error = "This lease is no longer held."
     }
 
-    var $attempts = $job.attempts|add:1
-    var $log = $job.attempt_log|default:[]|array_push:{
-      attempt: $attempts,
-      at: "now"|to_iso8601,
-      error: $input.error
+    var $attempts {
+      value = $job.attempts + 1
     }
 
-    conditional ($attempts >= $job.max_attempts) {
-      then {
-        db.add job_dead_letter {
+    var $log {
+      value = ($job.attempt_log|first_notnull:[])|push:{attempt: $attempts, at: now, error: $input.error}
+    }
+
+    var $updated {
+      value = null
+    }
+
+    conditional {
+      if ($attempts >= $job.max_attempts) {
+        db.add "job_dead_letter" {
           data = {
             job_id: $job.id,
             kind: $job.kind,
@@ -966,7 +1018,8 @@ function job_fail {
             attempt_log: $log
           }
         }
-        db.edit job {
+
+        db.edit "job" {
           field_name = "id"
           field_value = $job.id
           data = {
@@ -976,16 +1029,19 @@ function job_fail {
             attempt_log: $log,
             claim_token: null
           }
-        } as $updated
+        } as $dead
+
+        var.update $updated {
+          value = $dead
+        }
       }
       else {
-        // Full jitter: uniform in [0, 2^attempts) seconds, floored at one second
-        // so the first retry is not instant.
-        var $ceiling = 2|pow:$attempts
-        security.random_number { min = 0 max = $ceiling } as $jitter
-        var $delay = $jitter|max:1
+        security.random_number {
+          min = 0
+          max = (2|pow:$attempts)
+        } as $jitter
 
-        db.edit job {
+        db.edit "job" {
           field_name = "id"
           field_value = $job.id
           data = {
@@ -995,9 +1051,13 @@ function job_fail {
             attempt_log: $log,
             claim_token: null,
             claimed_at: null,
-            run_after: "now"|add_seconds:$delay
+            run_after: ((now|to_ms) + (($jitter|num_max:1) * 1000))
           }
-        } as $updated
+        } as $backed_off
+
+        var.update $updated {
+          value = $backed_off
+        }
       }
     }
   }
@@ -1013,102 +1073,92 @@ function job_fail {
 // function/webhook_verify.xs
 // webhook-inbox: per-source HMAC verification.
 //
-// Three things this gets right that a naive version does not.
+// 🔴 One thing here is a compromise forced by the platform, and it is stated
+// rather than hidden. **XanoScript has no access to the raw request body.** The
+// documented request variables are `$env.$http_headers`, `$env.$remote_ip`,
+// `$env.$request_method`, `$env.$request_uri` and `$env.$request_querystring` —
+// there is no raw-body equivalent, and an endpoint only ever sees the parsed
+// input. So the digest cannot be taken over the bytes as they arrived.
 //
-// 1. The digest is computed over the RAW BYTES. Re-serialising the parsed JSON
-//    reorders keys, and the signature stops matching for reasons that look like
-//    the provider being broken. `$http.raw_body`, never `$input.body`.
-// 2. The comparison is constant-time. A `==` on hex strings leaks the position
-//    of the first differing byte through timing, which is enough to forge a
-//    signature given patience and a fast network.
-// 3. A timestamp window is enforced. A correctly signed request from last month
-//    is still correctly signed; without a window, one captured delivery can be
-//    replayed forever.
+// The signature base is therefore the RFC 8785 canonical form of the parsed
+// body — the same canonicaliser the ledger hashes with, so there is one
+// definition of "these bytes" in the whole system. That is sound when the
+// sender signs the same canonical form (which Chancery's own senders do) and it
+// is NOT interoperable with a provider that signs its own raw bytes. For such a
+// provider the verification has to happen at a proxy in front of Xano. See the
+// README.
 //
-// The secret is referenced as `{{ $env.X }}` per source. `$env` resolves
-// statically, so this is a switch on the slug rather than a lookup keyed by the
-// `secret_env` column — the column documents the mapping, this stack performs it.
-function webhook_verify {
-  description = "Verify an inbound webhook's HMAC signature against its source."
+// What the platform does not compromise: the comparison is constant-time, a
+// `==` on hex strings leaks the position of the first differing byte through
+// timing; and a timestamp window is enforced, because a correctly signed
+// request from last month is still correctly signed.
+//
+// The secret is referenced as `$env.NAME`. `$env` resolves statically, so this
+// is a switch on the slug rather than a lookup keyed by the `secret_env`
+// column — the column documents the mapping, this stack performs it.
+function "webhook_verify" {
+  description = "Verify an inbound webhook's HMAC over the canonical body."
 
   input {
     text slug
-    text raw_body
+    json body
     text signature
-    text? timestamp
+    text? timestamp?
     int tolerance_seconds
-    enum algo { values = ["sha256", "sha512"] }
+    enum algo {
+      values = ["sha256", "sha512"]
+    }
   }
 
   stack {
-    conditional ($input.slug == "foxit-esign") {
-      then { var $secret = "{{ $env.FOXIT_WEBHOOK_SECRET }}" }
-      else {
-        conditional ($input.slug == "doctavian") {
-          then { var $secret = "{{ $env.DOCTAVIAN_WEBHOOK_SECRET }}" }
-          // An unknown source has no secret, so nothing can verify against it.
-          // Failing closed here means adding a source is a deliberate edit.
-          else { var $secret = null }
+    var $secret {
+      value = null
+    }
+
+    conditional {
+      if ($input.slug == "foxit-esign") {
+        var.update $secret {
+          value = $env.FOXIT_WEBHOOK_SECRET
+        }
+      }
+      elseif ($input.slug == "doctavian") {
+        var.update $secret {
+          value = $env.DOCTAVIAN_WEBHOOK_SECRET
         }
       }
     }
+
     precondition ($secret != null && $secret != "") {
       error_type = "accessdenied"
       error = "Unknown webhook source."
     }
 
-    // Replay window. Skipped only when the provider sends no timestamp at all,
-    // in which case the delivery-id uniqueness index is the only replay defence
-    // and the source row should say so.
-    conditional ($input.timestamp != null) {
-      then {
-        var $skew = "now"|to_timestamp|subtract:($input.timestamp|to_timestamp)|abs
-        precondition ($skew <= ($input.tolerance_seconds|multiply:1000)) {
-          error_type = "accessdenied"
-          error = "Signature timestamp outside the accepted window."
+    var $skew_ok {
+      value = true
+    }
+
+    conditional {
+      if ($input.timestamp != null) {
+        var.update $skew_ok {
+          value = ((now|to_seconds) - ($input.timestamp|to_seconds))|abs <= $input.tolerance_seconds
         }
       }
     }
 
+    precondition ($skew_ok == true) {
+      error_type = "accessdenied"
+      error = "Signature timestamp outside the accepted window."
+    }
+
     api.lambda {
       timeout = 5
-      code = `
-        const crypto = require('crypto');
-
-        // Providers sign either the body alone or "<timestamp>.<body>". Both
-        // candidates are computed and both compared, so adding a provider does
-        // not mean editing this stack.
-        const secret = $input.secret;
-        const body = $input.raw_body;
-        const algo = $input.algo;
-
-        const candidates = [body];
-        if ($input.timestamp) candidates.push($input.timestamp + '.' + body);
-
-        // Providers also disagree on encoding; strip a scheme prefix and accept
-        // hex or base64.
-        const received = String($input.signature).replace(/^(sha256=|sha512=|v1=)/, '');
-        const receivedBuf = /^[0-9a-f]+$/i.test(received)
-          ? Buffer.from(received, 'hex')
-          : Buffer.from(received, 'base64');
-
-        for (const candidate of candidates) {
-          const expected = crypto.createHmac(algo, secret).update(candidate, 'utf8').digest();
-          // timingSafeEqual throws on a length mismatch, which is itself a
-          // signal, so the length is checked first and reported as a plain miss.
-          if (expected.length === receivedBuf.length && crypto.timingSafeEqual(expected, receivedBuf)) {
-            return true;
-          }
-        }
-        return false;
-      `
-      // The secret is passed as a lambda variable rather than interpolated into
-      // the source, so it never appears in a stack dump or a request log.
-      vars = { secret: $secret }
+      code = "const crypto = require('crypto');\n\n// Same canonical form as ledger_append and src/lib/core/canonical.ts.\n// Using one definition of \"these bytes\" everywhere is the only way a\n// signature computed off-platform can be reproduced on it.\nfunction canon(value) {\n  if (value === null) return 'null';\n  const kind = typeof value;\n  if (kind === 'boolean') return value ? 'true' : 'false';\n  if (kind === 'number') {\n    if (!Number.isFinite(value)) throw new Error('non-finite number cannot be hashed');\n    return Object.is(value, -0) ? '0' : JSON.stringify(value);\n  }\n  if (kind === 'string') return JSON.stringify(value);\n  if (kind === 'undefined') throw new Error('undefined cannot be hashed');\n  if (Array.isArray(value)) return '[' + value.map(canon).join(',') + ']';\n  const keys = Object.keys(value).sort();\n  return '{' + keys.map(function (k) {\n    return JSON.stringify(k) + ':' + canon(value[k]);\n  }).join(',') + '}';\n}\n\nconst base = canon($input.body);\n// Providers sign either the payload alone or '<timestamp>.<payload>'.\n// Both are computed so adding a source is a data change, not a code one.\nconst candidates = [base];\nif ($input.timestamp) candidates.push($input.timestamp + '.' + base);\n\n// Providers also disagree on encoding; strip a scheme prefix, accept\n// hex or base64.\nconst received = String($input.signature).replace(/^(sha256=|sha512=|v1=)/, '');\nconst receivedBuf = /^[0-9a-f]+$/i.test(received)\n  ? Buffer.from(received, 'hex')\n  : Buffer.from(received, 'base64');\n\nfor (const candidate of candidates) {\n  const expected = crypto.createHmac($input.algo, $var.secret).update(candidate, 'utf8').digest();\n  // timingSafeEqual throws on a length mismatch, which is itself a\n  // signal, so length is checked first and reported as a plain miss.\n  if (expected.length === receivedBuf.length && crypto.timingSafeEqual(expected, receivedBuf)) {\n    return true;\n  }\n}\nreturn false;"
     } as $verified
   }
 
-  response = { verified: $verified }
+  response = {
+    verified: $verified
+  }
 }
 ---
 // function/act_execute.xs
@@ -1125,7 +1175,7 @@ function webhook_verify {
 // The registrar's idempotency key is the act's uid, not a fresh uuid. A timeout
 // on a registration is not evidence that nothing was bought, and replaying the
 // same key is the only safe way to find out.
-function act_execute {
+function "act_execute" {
   description = "Execute one allowed act against its vendor, exactly once."
 
   input {
@@ -1133,77 +1183,84 @@ function act_execute {
   }
 
   stack {
-    db.get act { field_name = "id" field_value = $input.job.payload.act_id } as $act
-    precondition ($act != null) { error_type = "notfound" error = "No such act." }
+    db.get "act" {
+      field_name = "id"
+      field_value = $input.job.payload.act_id
+    } as $act
 
-    conditional ($act.executed == true) {
-      // Already done. The lease was reaped and re-issued, or the provider
-      // retried. Completing quietly is correct: the work exists.
-      then { var $reference = $act.reference }
-      else {
-        db.get writ { field_name = "id" field_value = $act.writ_id } as $writ
-        precondition ($writ != null) { error_type = "notfound" error = "No such writ." }
+    precondition ($act != null) {
+      error_type = "notfound"
+      error = "No such act."
+    }
 
-        // Revocation beats a queued job. This is the whole reason execution is
-        // deferred through a durable queue rather than done inline.
+    var $reference {
+      value = $act.reference
+    }
+
+    conditional {
+      if ($act.executed == false) {
+        db.get "writ" {
+          field_name = "id"
+          field_value = $act.writ_id
+        } as $writ
+
+        precondition ($writ != null) {
+          error_type = "notfound"
+          error = "No such writ."
+        }
+
         precondition ($writ.status == "active") {
           error_type = "accessdenied"
           error = "The writ is no longer active; this act will not be carried out."
         }
+
         precondition ($act.outcome == "allow") {
           error_type = "accessdenied"
           error = "This act was refused."
         }
 
-        conditional ($act.kind == "domain.register") {
-          then {
-            api.request {
-              url = "https://api.name.com/core/v1/domains"
-              method = "POST"
-              params = {}
-                |set:"domain":{name: $act.fields.domainName}
-                |set:"purchasePrice":($act.amount_minor_units|divide:100)
-              headers = []
-                |array_push:"Content-Type: application/json"
-                |array_push:("Authorization: Basic {{ $env.NAMECOM_BASIC_AUTH }}")
-                |array_push:("x-idempotency-key: " ~ $act.uid)
-              timeout = 30
-            } as $vendor
-
-            precondition ($vendor.status >= 200 && $vendor.status < 300) {
-              error_type = "fatal"
-              error = "Registrar refused the registration."
-            }
-            var $reference = $vendor.response.order|to_text
-          }
-          else {
-            throw { error_type = "fatal" error = "No executor wired for this act kind." }
-          }
+        precondition ($act.kind == "domain.register") {
+          error_type = "standard"
+          error = "No executor wired for this act kind."
         }
 
-        db.edit act {
+        api.request {
+          url = "https://api.name.com/core/v1/domains"
+          method = "POST"
+          params = {domain: {name: $act.fields.domainName}, purchasePrice: ($act.amount_minor_units / 100)}
+          headers = ["Content-Type: application/json", "Authorization: Basic " ~ $env.NAMECOM_BASIC_AUTH, "x-idempotency-key: " ~ $act.uid]
+          timeout = 30
+        } as $vendor
+
+        precondition ($vendor.response.status >= 200 && $vendor.response.status < 300) {
+          error_type = "standard"
+          error = "Registrar refused the registration."
+        }
+
+        var.update $reference {
+          value = $vendor.response.result.order
+        }
+
+        db.edit "act" {
           field_name = "id"
           field_value = $act.id
-          data = { executed: true, reference: $reference, executed_at: "now" }
+          data = {
+            executed: true,
+            reference: $reference,
+            executed_at: now
+          }
         }
 
-        function.ledger_append {
-          kind = "act.executed"
-          at = "now"|to_iso8601
-          payload = {
-            writId: $writ.uid,
-            kind: $act.kind,
-            reference: $reference,
-            grantRef: $act.grant_ref
-          }
-          writ_id = $writ.uid
-          principal_id = $writ.principal_id
+        function.run "ledger_append" {
+          input = {kind: "act.executed", at: now, payload: {writId: $writ.uid, kind: $act.kind, reference: $reference, grantRef: $act.grant_ref}, writ_id: $writ.uid, principal_id: $writ.principal_id}
         }
       }
     }
   }
 
-  response = { reference: $reference }
+  response = {
+    reference: $reference
+  }
 }
 ---
 // function/webhook_esign_process.xs
@@ -1215,13 +1272,12 @@ function act_execute {
 // failable lives here, where a failure means a retry with backoff instead of a
 // provider marking the endpoint unhealthy and giving up on the delivery.
 //
-// The writ is moved to `pending_signature` -> signed-envelope-known only. It is
-// NOT moved to `active` here, and that is the security boundary: activation
-// requires the signed PDF to be fetched, hashed, and read back into an
-// enforceable policy by the extractor, which happens in the console with the
+// The writ is NOT moved to `active` here, and that is the security boundary:
+// activation requires the signed PDF to be fetched, hashed, and read back into
+// an enforceable policy by the extractor, which happens in the console with the
 // signing credential. A webhook body saying "signed" is a claim by a third
 // party, and this product does not enforce claims — it enforces documents.
-function webhook_esign_process {
+function "webhook_esign_process" {
   description = "Process a verified eSign completion callback out of band."
 
   input {
@@ -1229,231 +1285,120 @@ function webhook_esign_process {
   }
 
   stack {
-    db.get webhook_request {
+    db.get "webhook_request" {
       field_name = "id"
       field_value = $input.job.payload.webhook_request_id
     } as $request
-    precondition ($request != null) { error_type = "notfound" error = "No such webhook request." }
+
+    precondition ($request != null) {
+      error_type = "notfound"
+      error = "No such webhook request."
+    }
+
     precondition ($request.verified == true) {
       error_type = "accessdenied"
       error = "Refusing to process an unverified delivery."
     }
 
-    var $body = $request.raw_body|json_decode
-    var $envelope_id = $body.envelopeId|default:$body.envelope_id
+    var $body {
+      value = $request.raw_body|json_decode
+    }
 
-    db.query writ {
-      where = ($db.writ.envelope_id == $envelope_id)
-      per_page = 1
-    } as $rows
-    var $writ = $rows|first
+    var $envelope_id {
+      value = $body.envelopeId|first_notnull:$body.envelope_id
+    }
+
+    db.query "writ" {
+      where = $db.writ.envelope_id == $envelope_id
+      return = {type: "single"}
+    } as $writ
+
     precondition ($writ != null) {
       error_type = "notfound"
       error = "No writ is waiting on that envelope."
     }
 
-    // Recorded as `writ.issued` with a stage marker rather than as a new kind:
-    // the ledger's kinds are the domain's kinds, and adding one for a vendor's
-    // callback would put a vendor's vocabulary inside published evidence.
-    function.ledger_append {
-      kind = "writ.issued"
-      at = "now"|to_iso8601
-      payload = {
-        writId: $writ.uid,
-        stage: "esign_completed",
-        envelopeId: $envelope_id,
-        deliveryId: $request.delivery_id
-      }
-      writ_id = $writ.uid
-      principal_id = $writ.principal_id
+    function.run "ledger_append" {
+      input = {kind: "writ.issued", at: now, payload: {writId: $writ.uid, stage: "esign_completed", envelopeId: $envelope_id, deliveryId: $request.delivery_id}, writ_id: $writ.uid, principal_id: $writ.principal_id}
     }
 
-    db.edit webhook_request {
+    db.edit "webhook_request" {
       field_name = "id"
       field_value = $request.id
-      data = { status: "processed", processed_at: "now" }
+      data = {
+        status: "processed",
+        processed_at: now
+      }
     }
   }
 
-  response = { writ_id: $writ.uid, envelope_id: $envelope_id }
+  response = {
+    writ_id: $writ.uid,
+    envelope_id: $envelope_id
+  }
 }
 ---
-// middleware/require_auth.xs
-// Centralised authentication. Attached to the `chancery` API group, so every
-// endpoint in it is authenticated by the group's configuration rather than by
-// each stack remembering to check.
+// function/rate_guard.xs
+// A rate limit that works without Redis.
 //
-// Xano's pre-launch checklist calls for exactly this — "applied centralised
-// middleware for cross-cutting auth" — and the reason is that a per-endpoint
-// check is a per-endpoint chance to forget. The one endpoint somebody adds at
-// 3am is the one that ships unauthenticated.
+// Xano's documented rate limiter is `redis.ratelimit`, and Redis is an
+// Essential-plan feature — so on the free tier the pre-launch checklist item
+// "add rate limiting to login, signup and other obvious harvest targets" has no
+// built-in answer. This is the answer: the `audit` table already records every
+// mutating call with its source IP, so counting recent rows for one path from
+// one address is a throttle with no new infrastructure.
 //
-// This runs `pre`, before the stack, and confirms two separate things: that a
-// token was presented and resolved, and that the principal it names still
-// exists. A deleted account whose JWT has not yet expired is still a valid
-// signature over a row that is gone.
-middleware require_auth {
+// It is weaker than Redis in exactly one way worth stating: the count is a
+// table scan under an index rather than an atomic counter, so two requests that
+// arrive in the same millisecond can both read the same count and both pass.
+// For credential-harvest defence that is irrelevant — the attacker needs
+// thousands of attempts, not two — and it fails closed on the volume that
+// actually matters.
+function "rate_guard" {
+  description = "Refuse a caller that has hit this path too often from one IP."
+
   input {
-    json vars
-    enum type { values = ["pre", "post"] }
+    text path
+    int max
+    int window_seconds
   }
 
   stack {
-    conditional ($type == "pre") {
-      then {
-        precondition ($auth.id != null) {
-          error_type = "unauthorized"
-          error = "Authentication required."
-        }
+    db.query "audit" {
+      where = $db.audit.path == $input.path && $db.audit.ip == $env.$remote_ip && $db.audit.created_at > ((now|to_ms) - ($input.window_seconds * 1000))
+      return = {type: "count"}
+    } as $recent
 
-        db.get principal { field_name = "id" field_value = $auth.id } as $principal
-        precondition ($principal != null) {
-          error_type = "unauthorized"
-          error = "Authentication required."
-        }
-      }
+    precondition ($recent < $input.max) {
+      error_type = "accessdenied"
+      error = "Too many attempts from this address. Try again shortly."
     }
   }
 
-  response_strategy = "merge"
-  // Never silent. A middleware whose failure is swallowed is a middleware that
-  // is not enforcing anything.
-  exception_policy = "critical"
-}
----
-// middleware/audit_mutation.xs
-// Append an audit row for every mutating call. Attached to every API group.
-//
-// Two decisions worth stating.
-//
-// Reads are not logged. They happen constantly, they prove nothing, and burying
-// the twelve state changes of the day under forty thousand GETs is how an audit
-// log becomes something nobody reads.
-//
-// `exception_policy = "critical"`, so a call whose audit row cannot be written
-// fails. That is the uncomfortable choice and it is deliberate: Chancery fails
-// closed everywhere else — an unavailable diligence check denies the act rather
-// than waving it through — and an unrecorded mutation is worse than a refused
-// one. The alternative is a system that quietly stops keeping records exactly
-// when it is under stress.
-//
-// This is the access log, not the chain. The ledger records what Chancery
-// DECIDED and is published; this records who called what and stays private.
-middleware audit_mutation {
-  input {
-    json vars
-    enum type { values = ["pre", "post"] }
-  }
-
-  stack {
-    // Post, so the row records a call that actually reached its stack, and so a
-    // request rejected by `require_auth` is not logged as an attempted mutation
-    // by a principal that was never authenticated.
-    conditional (
-      $type == "post"
-      && ($request.method == "POST" || $request.method == "PATCH" || $request.method == "PUT" || $request.method == "DELETE")
-    ) {
-      then {
-        function.audit_append {
-          principal_id = $auth.id
-          method = $request.method
-          path = $request.path
-          ip = $request.ip
-          // Xano's `password` type is not readable back out of a request var, so
-          // signup and login inputs arrive here already redacted.
-          vars = $vars
-        }
-      }
-    }
-  }
-
-  response_strategy = "merge"
-  exception_policy = "critical"
-}
----
-// trigger/act_recorded.xs
-// Database trigger on `act` insert.
-//
-// It does two things, and it deliberately does not do a third.
-//
-// It queues execution. An act that was ALLOWED but not yet carried out is
-// handed to the durable queue here rather than by whoever wrote the row, so an
-// allowed act is executed no matter which path created it — endpoint, task, or a
-// human clicking Add Record in the Xano UI. The act's uid is the idempotency
-// key, so the same decision cannot buy two domains.
-//
-// It maintains the consumed-budget counters on `writ`. Those are derived state
-// for the console; the decision engine evaluates limits against act rows, never
-// against a counter, so a drift here can misinform a dashboard but can never
-// widen an authority.
-//
-// It does NOT append to the ledger. The chain has exactly one writer, and a
-// trigger firing inside another statement's transaction would nest chain
-// appends inside writes that may still roll back — producing either a gap in
-// the sequence or an entry for an act that never existed. The endpoints append
-// explicitly, in their own transaction, where the ordering is legible.
-table_trigger act_recorded {
-  table = "act"
-  actions = ["insert"]
-
-  stack {
-    conditional ($new.outcome == "allow" && $new.executed == false) {
-      then {
-        function.job_enqueue {
-          kind = "act.execute"
-          idempotency_key = $new.uid
-          payload = { act_id: $new.id, act_uid: $new.uid, writ_id: $new.writ_id, kind: $new.kind }
-        }
-      }
-    }
-
-    conditional ($new.executed == true) {
-      then {
-        db.get writ { field_name = "id" field_value = $new.writ_id } as $writ
-        conditional ($writ != null) {
-          then {
-            db.edit writ {
-              field_name = "id"
-              field_value = $writ.id
-              data = {
-                consumed_count: $writ.consumed_count|add:1,
-                consumed_minor_units: $writ.consumed_minor_units|add:($new.amount_minor_units|default:0),
-                updated_at: "now"
-              }
-            }
-          }
-        }
-      }
-    }
+  response = {
+    recent: $recent
   }
 }
 ---
-// api/auth/_group.xs
-// Signup and login only. Deliberately its own group so that the group-level
-// authentication requirement on `chancery` does not have to be punched a hole
-// in — the two endpoints that legitimately run unauthenticated live somewhere
-// that has no authenticated endpoints to leak past.
+// api/auth/api_group.xs
+// Signup and login only. Deliberately its own group so that the authentication
+// requirement on `chancery` never has to be punched a hole in — an
+// unauthenticated endpoint sitting inside an otherwise-authenticated group is
+// precisely the mistake Xano's own guidance names as most common.
 //
-// Swagger is private: an unauthenticated, publicly readable schema of the auth
-// surface is a free map for anyone enumerating it.
+// `canonical` must be unique across the whole INSTANCE, not just this
+// workspace, because Xano routes between workspaces on it. Hence the
+// `chancery-` prefix on every group here: a bare `auth` would eventually
+// collide with somebody else's.
 //
-// CORS is an explicit allowlist. A wildcard here would let any page a principal
-// happens to have open post their credentials to us and read the token back.
-apigroup auth {
+// Swagger visibility is not set here on purpose. XanoScript's only control is
+// `swagger = {token: "..."}`, and the docs are explicit that the token is
+// stored in plain text — committing one would put a credential in git to
+// protect a schema. It is set to Private in the workspace UI instead.
+api_group "auth" {
   description = "Credential exchange. Two endpoints, both rate limited."
-  canonical = "auth"
-  swagger = "private"
-  external_access = true
-
-  cors = {
-    origins = ["{{ $env.CONSOLE_ORIGIN }}"]
-    methods = ["POST", "OPTIONS"]
-    headers = ["content-type"]
-    credentials = false
-    max_age = 600
-  }
-
-  middleware = ["audit_mutation"]
+  canonical = "chancery-auth"
+  tags = ["chancery", "auth"]
 }
 ---
 // api/auth/signup.xs
@@ -1463,54 +1408,61 @@ apigroup auth {
 // any backend, and the free tier's own throughput cap is not a security control:
 // it is shared across the whole workspace, so a scripted signup flood would take
 // the entire product down rather than just being throttled.
-query auth/signup verb=POST {
+//
+// The audit row is written by an explicit call rather than by middleware.
+// Middleware is an Essential-plan feature — the Metadata API refuses a
+// `middleware` definition on free with "Please upgrade to access middleware" —
+// so the cross-cutting concern is a function every mutating endpoint calls.
+query "auth/signup" verb=POST {
   description = "Create a principal and issue a JWT."
+  api_group = "auth"
 
   input {
-    text legal_name? filters=trim
-    email email? filters=trim|lower
-    // Length is enforced by the column filter too; stating it here means a bad
-    // password is rejected before a row is attempted.
-    text password? filters=min:12
+    text legal_name filters=trim
+    email email filters=trim|lower
+    text password filters=min:12
   }
 
   stack {
-    security.rate_limit {
-      key = ("signup:" ~ $request.ip)
-      max = 5
-      ttl = 900
-      error = "Too many signup attempts. Try again later."
+    function.run "rate_guard" {
+      input = {path: "auth/signup", max: 5, window_seconds: 900}
     }
 
-    db.get principal { field_name = "email" field_value = $input.email } as $existing
+    function.run "audit_append" {
+      input = {principal_id: null, method: "POST", path: "auth/signup", ip: $env.$remote_ip, vars: {email: $input.email}, ledger_sequence: null}
+    }
+
+    db.get "principal" {
+      field_name = "email"
+      field_value = $input.email
+    } as $existing
+
     precondition ($existing == null) {
       error_type = "accessdenied"
       error = "That email already has a Chancery account."
     }
 
-    security.uuid {} as $uid
-    db.add principal {
+    security.create_uuid {
+    } as $uid
+
+    db.add "principal" {
       data = {
-        created_at: "now",
         uid: $uid,
         legal_name: $input.legal_name,
         email: $input.email,
         password: $input.password,
-        // Never settable from a request. It becomes true only when the
-        // diligence service corroborates the entity against live web data.
         entity_verified: false
       }
     } as $principal
 
     security.create_auth_token {
       table = "principal"
+      id = $principal.id
       extras = {}
       expiration = 86400
-      id = $principal.id
     } as $authToken
   }
 
-  // The password column is never in this shape, and neither is the row id.
   response = {
     authToken: $authToken,
     principal: {
@@ -1529,35 +1481,39 @@ query auth/signup verb=POST {
 // message and the same status. Distinguishing them turns the endpoint into a
 // membership oracle over the customer list, and a principal's email is exactly
 // the thing an attacker wants to confirm before phishing a signature out of them.
-//
-// Rate limited on the email, not only the IP: an attacker spraying one password
-// across many accounts from a rotating pool is the shape this catches.
-query auth/login verb=POST {
+query "auth/login" verb=POST {
   description = "Exchange credentials for a JWT."
+  api_group = "auth"
 
   input {
-    email email? filters=trim|lower
-    text password?
+    email email filters=trim|lower
+    text password
   }
 
   stack {
-    security.rate_limit {
-      key = ("login:" ~ $input.email)
-      max = 10
-      ttl = 900
-      error = "Too many attempts for that account. Try again later."
+    function.run "rate_guard" {
+      input = {path: "auth/login", max: 10, window_seconds: 900}
     }
 
-    db.get principal { field_name = "email" field_value = $input.email } as $principal
+    function.run "audit_append" {
+      input = {principal_id: null, method: "POST", path: "auth/login", ip: $env.$remote_ip, vars: {email: $input.email}, ledger_sequence: null}
+    }
+
+    db.get "principal" {
+      field_name = "email"
+      field_value = $input.email
+    } as $principal
+
     precondition ($principal != null) {
       error_type = "accessdenied"
       error = "Invalid credentials."
     }
 
-    security.validate_password {
-      password = $input.password
-      hash = $principal.password
+    security.check_password {
+      text_password = $input.password
+      hash_password = $principal.password
     } as $valid
+
     precondition ($valid == true) {
       error_type = "accessdenied"
       error = "Invalid credentials."
@@ -1565,9 +1521,9 @@ query auth/login verb=POST {
 
     security.create_auth_token {
       table = "principal"
+      id = $principal.id
       extras = {}
       expiration = 86400
-      id = $principal.id
     } as $authToken
   }
 
@@ -1582,39 +1538,26 @@ query auth/login verb=POST {
   }
 }
 ---
-// api/chancery/_group.xs
-// The authenticated surface. Every endpoint in this group requires a JWT, and
-// there are no exceptions inside it — the endpoints that legitimately run
-// without one live in `auth` and `public`, which is the whole reason those
-// groups exist. Xano's own security guidance names the most common
-// application-level mistake as "leaving auto-generated endpoints reachable and
-// unauthenticated"; a group with no unauthenticated members cannot acquire one
-// by accident.
+// api/chancery/api_group.xs
+// The authenticated surface. Every endpoint in this group declares
+// `auth = "principal"`, and there are no exceptions inside it — the endpoints
+// that legitimately run without a token live in `auth` and `public`, which is
+// the whole reason those groups exist.
 //
-// There is no auto-generated CRUD anywhere in this workspace. Every endpoint
-// below is hand-written, assembles a domain object rather than returning a row,
-// and scopes to `$auth.id` through `writ_owned` rather than trusting the
-// identifier in the path.
-apigroup chancery {
+// Xano's security guidance names the most common application-level mistake as
+// "leaving auto-generated endpoints reachable and unauthenticated". A group
+// whose every member declares auth cannot acquire an unauthenticated one by
+// accident, and `tests/xano/backend.test.ts` asserts that property over the
+// source rather than trusting it.
+//
+// There is no auto-generated CRUD anywhere in this workspace. Every endpoint is
+// hand-written, assembles a domain object rather than returning a row, and
+// scopes to `$auth.id` through `writ_owned` rather than trusting the identifier
+// in the path.
+api_group "chancery" {
   description = "Writ registry, act history, ledger and receipts. JWT only."
   canonical = "chancery"
-  swagger = "private"
-  external_access = true
-
-  authentication = { table = "principal" }
-
-  cors = {
-    // Explicit allowlist, not `*`. With credentials enabled a wildcard is not
-    // merely loose, it is the browser handing any origin a principal visits the
-    // ability to act as them.
-    origins = ["{{ $env.CONSOLE_ORIGIN }}"]
-    methods = ["GET", "POST", "PATCH", "OPTIONS"]
-    headers = ["authorization", "content-type"]
-    credentials = true
-    max_age = 600
-  }
-
-  middleware = ["require_auth", "audit_mutation"]
+  tags = ["chancery", "authenticated"]
 }
 ---
 // api/chancery/me.xs
@@ -1623,13 +1566,22 @@ apigroup chancery {
 // Answers only about the token holder. There is no `GET /principal/{id}` in this
 // workspace, because there is no reason for one to exist and every reason for it
 // not to.
-query me verb=GET {
+query "me" verb=GET {
   description = "The authenticated principal."
+  api_group = "chancery"
+  auth = "principal"
+
+  input {
+  }
 
   stack {
-    db.get principal { field_name = "id" field_value = $auth.id } as $principal
+    db.get "principal" {
+      field_name = "id"
+      field_value = $auth.id
+    } as $principal
+
     precondition ($principal != null) {
-      error_type = "unauthorized"
+      error_type = "accessdenied"
       error = "Authentication required."
     }
   }
@@ -1657,42 +1609,48 @@ query me verb=GET {
 //
 // Clauses are inserted, never merged. A writ is drafted whole and then signed
 // whole; there is no partial amendment path anywhere in this API.
-query writ verb=POST {
+query "writ" verb=POST {
   description = "Draft a writ. Returns the assembled instrument, status `draft`."
+  api_group = "chancery"
+  auth = "principal"
 
   input {
-    text agent_external_id? filters=trim
-    text agent_label? filters=trim
-    text agent_domain? filters=trim|lower
-    text agent_public_key? filters=trim
-    timestamp effective_from?
-    timestamp expires_at?
-    text jurisdiction? filters=trim
-    // [{ ref, act_kind, limits, conditions }] — limits and conditions stored
-    // verbatim; see the note on `clause`.
-    json grants?
+    text agent_external_id filters=trim
+    text agent_label filters=trim
+    text agent_domain filters=trim|lower
+    text agent_public_key filters=trim
+    timestamp effective_from
+    timestamp expires_at
+    text jurisdiction filters=trim
+    json grants
   }
 
   stack {
+    function.run "audit_append" {
+      input = {principal_id: $auth.id, method: "POST", path: "writ", ip: $env.$remote_ip, vars: {agent_domain: $input.agent_domain}, ledger_sequence: null}
+    }
+
     precondition ($input.expires_at > $input.effective_from) {
-      error_type = "input"
+      error_type = "inputerror"
       error = "A writ cannot expire before it takes effect."
     }
-    precondition ($input.grants|count > 0) {
-      error_type = "input"
+
+    precondition (($input.grants|count) > 0) {
+      error_type = "inputerror"
       error = "A writ that grants nothing is not a writ."
     }
 
-    db.query agent {
-      where = ($db.agent.principal_id == $auth.id && $db.agent.domain == $input.agent_domain)
-      per_page = 1
-    } as $found
+    db.query "agent" {
+      where = $db.agent.principal_id == $auth.id && $db.agent.domain == $input.agent_domain
+      return = {type: "single"}
+    } as $agent
 
-    conditional ($found|count > 0) {
-      then { var $agent = $found|first }
-      else {
-        security.uuid {} as $agent_uid
-        db.add agent {
+    conditional {
+      if ($agent == null) {
+        security.create_uuid {
+        } as $agent_uid
+
+        db.add "agent" {
           data = {
             uid: $agent_uid,
             principal_id: $auth.id,
@@ -1701,12 +1659,18 @@ query writ verb=POST {
             domain: $input.agent_domain,
             public_key: $input.agent_public_key
           }
-        } as $agent
+        } as $created_agent
+
+        var.update $agent {
+          value = $created_agent
+        }
       }
     }
 
-    security.uuid {} as $writ_uid
-    db.add writ {
+    security.create_uuid {
+    } as $writ_uid
+
+    db.add "writ" {
       data = {
         uid: $writ_uid,
         principal_id: $auth.id,
@@ -1719,22 +1683,32 @@ query writ verb=POST {
       }
     } as $writ
 
-    var $ordinal = 0
-    for_each ($input.grants as $grant) {
-      db.add clause {
-        data = {
-          writ_id: $writ.id,
-          ref: $grant.ref,
-          act_kind: $grant.act_kind,
-          limits: $grant.limits,
-          conditions: $grant.conditions,
-          ordinal: $ordinal
-        }
-      }
-      var $ordinal = $ordinal|add:1
+    var $ordinal {
+      value = 0
     }
 
-    function.writ_assemble { writ_id = $writ.id } as $assembled
+    foreach ($input.grants) {
+      each as $grant {
+        db.add "clause" {
+          data = {
+            writ_id: $writ.id,
+            ref: $grant.ref,
+            act_kind: $grant.act_kind,
+            limits: $grant.limits,
+            conditions: $grant.conditions,
+            ordinal: $ordinal
+          }
+        }
+
+        var.update $ordinal {
+          value = $ordinal + 1
+        }
+      }
+    }
+
+    function.run "writ_assemble" {
+      input = {writ_id: $writ.id}
+    } as $assembled
   }
 
   response = $assembled
@@ -1751,19 +1725,34 @@ query writ verb=POST {
 // A writ belonging to another principal is also `null`, not 403. Returning
 // "forbidden" would confirm the uid exists, which is a membership oracle over
 // the whole registry.
-query writ/{writ_uid} verb=GET {
+query "writ/{writ_uid}" verb=GET {
   description = "One assembled writ, scoped to the caller."
+  api_group = "chancery"
+  auth = "principal"
 
   input {
     text writ_uid
   }
 
   stack {
-    function.writ_owned { writ_uid = $input.writ_uid required = false } as $writ
+    function.run "writ_owned" {
+      input = {writ_uid: $input.writ_uid, required: false}
+    } as $writ
 
-    conditional ($writ == null) {
-      then { var $assembled = null }
-      else { function.writ_assemble { writ_id = $writ.id } as $assembled }
+    var $assembled {
+      value = null
+    }
+
+    conditional {
+      if ($writ != null) {
+        function.run "writ_assemble" {
+          input = {writ_id: $writ.id}
+        } as $found
+
+        var.update $assembled {
+          value = $found
+        }
+      }
     }
   }
 
@@ -1771,7 +1760,7 @@ query writ/{writ_uid} verb=GET {
 }
 ---
 // api/chancery/writ_by_domain.xs
-// GET /writ/by_domain?domain= — getWritByAgentDomain
+// GET /writ_by_domain?domain= — getWritByAgentDomain
 //
 // This is the lookup the gate makes on every single act, so its resolution rule
 // is load-bearing: **newest first, whatever the status.**
@@ -1780,28 +1769,50 @@ query writ/{writ_uid} verb=GET {
 // needs to answer WRIT_REVOKED rather than NO_WRIT, and those are very different
 // things to tell a principal — one says "your authority was withdrawn", the
 // other says "you never had any", and only the first is true.
-query writ/by_domain verb=GET {
+//
+// The name is `writ_by_domain`, not `writ/by_domain`, and that is not a style
+// choice. Xano matches `writ/{writ_uid}` FIRST — a literal segment does not beat
+// a path parameter — so `GET /writ/by_domain` resolved to the by-uid endpoint
+// with `writ_uid = "by_domain"`, which then failed comparing a non-uuid against
+// the `uuid` column: `ParseError: Invalid value for param "writ.uid"`. Keeping
+// the two off a shared prefix is the only reliable fix.
+query "writ_by_domain" verb=GET {
   description = "The current writ for an agent domain, scoped to the caller."
+  api_group = "chancery"
+  auth = "principal"
 
   input {
-    text domain? filters=trim|lower
+    text domain filters=trim|lower
   }
 
   stack {
-    db.query writ {
-      // The join is on the caller's own agents. An agent domain is public
-      // information; the writ behind it is not.
-      join = [{table: "agent", on: ($db.agent.id == $db.writ.agent_id)}]
-      where = ($db.agent.domain == $input.domain && $db.writ.principal_id == $auth.id)
-      sort = [{field: "created_at", order: "desc"}, {field: "id", order: "desc"}]
-      per_page = 1
-    } as $rows
+    db.query "writ" {
+      join = {
+        agent: {
+          table: "agent",
+          type: "inner",
+          where: $db.agent.id == $db.writ.agent_id
+        }
+      }
+      where = $db.agent.domain == $input.domain && $db.writ.principal_id == $auth.id
+      sort = {created_at: "desc"}
+      return = {type: "single"}
+    } as $writ
 
-    var $writ = $rows|first
+    var $assembled {
+      value = null
+    }
 
-    conditional ($writ == null) {
-      then { var $assembled = null }
-      else { function.writ_assemble { writ_id = $writ.id } as $assembled }
+    conditional {
+      if ($writ != null) {
+        function.run "writ_assemble" {
+          input = {writ_id: $writ.id}
+        } as $found
+
+        var.update $assembled {
+          value = $found
+        }
+      }
     }
   }
 
@@ -1821,56 +1832,103 @@ query writ/by_domain verb=GET {
 // Revocation is terminal. Re-activating a revoked instrument by patch would make
 // the DNS tombstone and the registry disagree about live authority, and the
 // tombstone is the one a verifier reads.
-query writ/{writ_uid} verb=PATCH {
+query "writ/{writ_uid}" verb=PATCH {
   description = "Advance a writ's lifecycle. Cannot alter its terms."
+  api_group = "chancery"
+  auth = "principal"
 
   input {
     text writ_uid
-    enum status? { values = ["draft", "pending_signature", "active", "revoked", "expired"] }
-    text? document_url
-    text? document_sha256
-    text? envelope_id
-    json? policy
-    timestamp? anchored_at
+    enum? status? {
+      values = ["draft", "pending_signature", "active", "revoked", "expired"]
+    }
+    text? document_url?
+    text? document_sha256?
+    text? envelope_id?
+    json? policy?
+    timestamp? anchored_at?
   }
 
   stack {
-    function.writ_owned { writ_uid = $input.writ_uid } as $writ
+    function.run "audit_append" {
+      input = {principal_id: $auth.id, method: "PATCH", path: "writ/{writ_uid}", ip: $env.$remote_ip, vars: {writ_uid: $input.writ_uid, status: $input.status}, ledger_sequence: null}
+    }
 
-    precondition ($writ.status != "revoked" || $input.status == "revoked" || $input.status == null) {
+    function.run "writ_owned" {
+      input = {writ_uid: $input.writ_uid, required: true}
+    } as $writ
+
+    precondition ($writ.status != "revoked" || $input.status == null || $input.status == "revoked") {
       error_type = "accessdenied"
       error = "This writ is revoked; that is terminal."
     }
 
-    var $data = {}
-    conditional ($input.status != null) { then { var $data = $data|set:"status":$input.status } }
-    conditional ($input.document_url != null) { then { var $data = $data|set:"document_url":$input.document_url } }
-    conditional ($input.document_sha256 != null) { then { var $data = $data|set:"document_sha256":$input.document_sha256 } }
-    conditional ($input.envelope_id != null) { then { var $data = $data|set:"envelope_id":$input.envelope_id } }
-    conditional ($input.policy != null) { then { var $data = $data|set:"policy":$input.policy } }
-    conditional ($input.anchored_at != null) { then { var $data = $data|set:"anchored_at":$input.anchored_at } }
+    var $data {
+      value = {updated_at: now}
+    }
 
-    precondition ($data|count > 0) {
-      error_type = "input"
+    conditional {
+      if ($input.status != null) {
+        var.update $data {
+          value = $data|set:"status":$input.status
+        }
+      }
+    }
+    conditional {
+      if ($input.document_url != null) {
+        var.update $data {
+          value = $data|set:"document_url":$input.document_url
+        }
+      }
+    }
+    conditional {
+      if ($input.document_sha256 != null) {
+        var.update $data {
+          value = $data|set:"document_sha256":$input.document_sha256
+        }
+      }
+    }
+    conditional {
+      if ($input.envelope_id != null) {
+        var.update $data {
+          value = $data|set:"envelope_id":$input.envelope_id
+        }
+      }
+    }
+    conditional {
+      if ($input.policy != null) {
+        var.update $data {
+          value = $data|set:"policy":$input.policy
+        }
+      }
+    }
+    conditional {
+      if ($input.anchored_at != null) {
+        var.update $data {
+          value = $data|set:"anchored_at":$input.anchored_at
+        }
+      }
+    }
+
+    precondition (($data|count) > 1) {
+      error_type = "inputerror"
       error = "Nothing to update."
     }
 
-    // A policy may only be attached alongside the hash of the document it was
-    // extracted from. Storing terms that are not bound to a specific signed PDF
-    // is how an enforced policy stops being provably the one a human read.
-    precondition (
-      $input.policy == null
-      || $input.document_sha256 != null
-      || $writ.document_sha256 != null
-    ) {
-      error_type = "input"
+    precondition ($input.policy == null || $input.document_sha256 != null || $writ.document_sha256 != null) {
+      error_type = "inputerror"
       error = "A policy cannot be stored without the document hash it came from."
     }
 
-    var $data = $data|set:"updated_at":"now"
-    db.edit writ { field_name = "id" field_value = $writ.id data = $data }
+    db.patch "writ" {
+      field_name = "id"
+      field_value = $writ.id
+      data = $data
+    }
 
-    function.writ_assemble { writ_id = $writ.id } as $assembled
+    function.run "writ_assemble" {
+      input = {writ_id: $writ.id}
+    } as $assembled
   }
 
   response = $assembled
@@ -1885,30 +1943,35 @@ query writ/{writ_uid} verb=PATCH {
 // exhaust an authority that was never used.
 //
 // Ordered oldest first, which is the order a window calculation walks.
-query writ/{writ_uid}/act verb=GET {
+query "writ/{writ_uid}/act" verb=GET {
   description = "Executed acts under one writ, for cumulative limits."
+  api_group = "chancery"
+  auth = "principal"
 
   input {
     text writ_uid
   }
 
   stack {
-    function.writ_owned { writ_uid = $input.writ_uid } as $writ
+    function.run "writ_owned" {
+      input = {writ_uid: $input.writ_uid, required: true}
+    } as $writ
 
-    db.query act {
-      where = ($db.act.writ_id == $writ.id && $db.act.executed == true)
-      sort = [{field: "executed_at", order: "asc"}, {field: "id", order: "asc"}]
-      per_page = 500
+    db.query "act" {
+      where = $db.act.writ_id == $writ.id && $db.act.executed == true
+      sort = {executed_at: "asc"}
+      return = {type: "list"}
     } as $rows
 
-    var $history = []
-    for_each ($rows as $act) {
-      var $history = $history|array_push:{
-        kind: $act.kind,
-        grant_ref: $act.grant_ref,
-        amount_minor_units: $act.amount_minor_units,
-        currency: $act.currency,
-        executed_at: $act.executed_at|to_iso8601
+    var $history {
+      value = []
+    }
+
+    foreach ($rows) {
+      each as $act {
+        var.update $history {
+          value = $history|push:{kind: $act.kind, grant_ref: $act.grant_ref, amount_minor_units: $act.amount_minor_units, currency: $act.currency, executed_at: $act.executed_at}
+        }
       }
     }
   }
@@ -1924,15 +1987,18 @@ query writ/{writ_uid}/act verb=GET {
 // diligence, and packaged into a receipt. A second place that could produce a
 // verdict is a second place that could produce a different one.
 //
-// Writing this row fires the `act_recorded` trigger, which is what keeps the
-// consumed-budget counters on `writ` honest no matter which path wrote the act —
-// this endpoint, the queue worker, or a human in the Xano UI.
-query writ/{writ_uid}/act verb=POST {
+// On a paid plan, writing this row fires the `act_recorded` trigger, which keeps
+// the consumed-budget counters on `writ` honest no matter which path wrote the
+// act. Triggers are Essential-only, so on free those counters simply stay at
+// zero — nothing in the decision path reads them, so the gate is unaffected.
+query "writ/{writ_uid}/act" verb=POST {
   description = "Record one executed act against a writ."
+  api_group = "chancery"
+  auth = "principal"
 
   input {
     text writ_uid
-    enum kind? {
+    enum kind {
       values = [
         "domain.register",
         "domain.renew",
@@ -1942,28 +2008,36 @@ query writ/{writ_uid}/act verb=POST {
         "document.publish"
       ]
     }
-    text grant_ref?
-    int amount_minor_units?=0
-    text currency?="USD"
-    timestamp executed_at?
-    text? reference
-    json? fields
-    text? evidence_digest
+    text? grant_ref?
+    int? amount_minor_units?
+    text? currency?
+    timestamp executed_at
+    text? reference?
+    json? fields?
+    text? evidence_digest?
   }
 
   stack {
-    function.writ_owned { writ_uid = $input.writ_uid } as $writ
+    function.run "audit_append" {
+      input = {principal_id: $auth.id, method: "POST", path: "writ/{writ_uid}/act", ip: $env.$remote_ip, vars: {writ_uid: $input.writ_uid, kind: $input.kind}, ledger_sequence: null}
+    }
 
-    security.uuid {} as $uid
-    db.add act {
+    function.run "writ_owned" {
+      input = {writ_uid: $input.writ_uid, required: true}
+    } as $writ
+
+    security.create_uuid {
+    } as $uid
+
+    db.add "act" {
       data = {
         uid: $uid,
         writ_id: $writ.id,
         kind: $input.kind,
-        grant_ref: $input.grant_ref|default:"",
-        fields: $input.fields|default:{},
-        amount_minor_units: $input.amount_minor_units,
-        currency: $input.currency,
+        grant_ref: ($input.grant_ref|first_notnull:""),
+        fields: ($input.fields|first_notnull:{}),
+        amount_minor_units: ($input.amount_minor_units|first_notnull:0),
+        currency: ($input.currency|first_notnull:"USD"),
         outcome: "allow",
         executed: true,
         reference: $input.reference,
@@ -1973,7 +2047,10 @@ query writ/{writ_uid}/act verb=POST {
     } as $act
   }
 
-  response = { recorded: true, act_id: $act.uid }
+  response = {
+    recorded: true,
+    act_id: $act.uid
+  }
 }
 ---
 // api/chancery/ledger_append.xs
@@ -1985,15 +2062,17 @@ query writ/{writ_uid}/act verb=POST {
 // would compute the same next number and one would be rejected by the unique
 // index after its payload had already been accepted.
 //
-// So the chain is assigned here, under the lock `ledger_append` takes, and
+// So the chain is assigned by `ledger_append`, under the lock it takes, and
 // verified on the way back out by the client against the same canonical form.
 // Server-assigned and client-verified is the whole claim — an entry the caller
 // cannot reproduce is not evidence and the client refuses it.
-query ledger verb=POST {
+query "ledger" verb=POST {
   description = "Append one entry to the tamper-evident chain."
+  api_group = "chancery"
+  auth = "principal"
 
   input {
-    enum kind? {
+    enum kind {
       values = [
         "writ.issued",
         "writ.anchored",
@@ -2004,29 +2083,30 @@ query ledger verb=POST {
         "act.failed"
       ]
     }
-    text at?
-    json payload?
-    // Denormalised for scoping only. Verified below rather than trusted: a
-    // caller could otherwise file an entry under someone else's writ and make
-    // their audit trail say something it should not.
-    text? writ_id
+    text at
+    json payload
+    text? writ_id?
   }
 
   stack {
-    conditional ($input.writ_id != null) {
-      then {
-        function.writ_owned { writ_uid = $input.writ_id } as $writ
-        var $writ_uid = $writ.uid
-      }
-      else { var $writ_uid = null }
+    var $writ_uid {
+      value = null
     }
 
-    function.ledger_append {
-      kind = $input.kind
-      at = $input.at
-      payload = $input.payload
-      writ_id = $writ_uid
-      principal_id = $auth.id
+    conditional {
+      if ($input.writ_id != null) {
+        function.run "writ_owned" {
+          input = {writ_uid: $input.writ_id, required: true}
+        } as $writ
+
+        var.update $writ_uid {
+          value = $writ.uid
+        }
+      }
+    }
+
+    function.run "ledger_append" {
+      input = {kind: $input.kind, at: $input.at, payload: $input.payload, writ_id: $writ_uid, principal_id: $auth.id}
     } as $entry
   }
 
@@ -2045,52 +2125,64 @@ query ledger verb=POST {
 // hashed: it is an index for this query, not evidence. Anyone who wants to
 // verify the chain's integrity across principals uses `/ledger/spine` in the
 // public group, which returns linkage without payloads.
-query ledger verb=GET {
+//
+// The filter is TWO queries rather than one with `($uid == null || col == $uid)`.
+// A `where` clause compiles to SQL and is not short-circuited in XanoScript, so
+// the null branch still binds null against an indexed column and the request
+// dies with `ParseError: Invalid value for param`. Branching in the stack is the
+// only reliable way to make a filter optional.
+query "ledger" verb=GET {
   description = "The caller's ledger entries, oldest first."
+  api_group = "chancery"
+  auth = "principal"
 
   input {
-    text? writ_id
-    int? after_sequence
-    int? per_page
+    text? writ_id?
   }
 
   stack {
-    conditional ($input.writ_id != null) {
-      then {
-        // Verified, not trusted: without this a caller could read any writ's
-        // chain by guessing a uid.
-        function.writ_owned { writ_uid = $input.writ_id } as $writ
-        db.query ledger {
-          where = (
-            $db.ledger.writ_id == $writ.uid
-            && $db.ledger.principal_id == $auth.id
-            && $db.ledger.sequence > ($input.after_sequence|default:-1)
-          )
-          sort = [{field: "sequence", order: "asc"}]
-          per_page = $input.per_page|default:250
-        } as $rows
+    var $rows {
+      value = []
+    }
+
+    conditional {
+      if ($input.writ_id != null) {
+        function.run "writ_owned" {
+          input = {writ_uid: $input.writ_id, required: true}
+        } as $writ
+
+        db.query "ledger" {
+          where = $db.ledger.principal_id == $auth.id && $db.ledger.writ_id == $writ.uid
+          sort = {sequence: "asc"}
+          return = {type: "list"}
+        } as $scoped
+
+        var.update $rows {
+          value = $scoped
+        }
       }
       else {
-        db.query ledger {
-          where = (
-            $db.ledger.principal_id == $auth.id
-            && $db.ledger.sequence > ($input.after_sequence|default:-1)
-          )
-          sort = [{field: "sequence", order: "asc"}]
-          per_page = $input.per_page|default:250
-        } as $rows
+        db.query "ledger" {
+          where = $db.ledger.principal_id == $auth.id
+          sort = {sequence: "asc"}
+          return = {type: "list"}
+        } as $all
+
+        var.update $rows {
+          value = $all
+        }
       }
     }
 
-    var $entries = []
-    for_each ($rows as $row) {
-      var $entries = $entries|array_push:{
-        sequence: $row.sequence,
-        previous_hash: $row.previous_hash,
-        hash: $row.hash,
-        kind: $row.kind,
-        at: $row.at,
-        payload: $row.payload
+    var $entries {
+      value = []
+    }
+
+    foreach ($rows) {
+      each as $row {
+        var.update $entries {
+          value = $entries|push:{sequence: $row.sequence, previous_hash: $row.previous_hash, hash: $row.hash, kind: $row.kind, at: $row.at, payload: $row.payload}
+        }
       }
     }
   }
@@ -2111,72 +2203,62 @@ query ledger verb=GET {
 // its own content address could publish one bundle under the name of another,
 // and every citation of that address would then point at evidence for a
 // different decision.
-query evidence verb=POST {
+query "evidence" verb=POST {
   description = "Publish an evidence bundle at its content address."
+  api_group = "chancery"
+  auth = "principal"
 
   input {
-    text digest?
-    json bundle?
-    text? writ_id
-    enum outcome? { values = ["allow", "deny"] }
-    text evaluated_at?
+    text digest
+    json bundle
+    text? writ_id?
+    enum outcome {
+      values = ["allow", "deny"]
+    }
+    text evaluated_at
   }
 
   stack {
+    function.run "audit_append" {
+      input = {principal_id: $auth.id, method: "POST", path: "evidence", ip: $env.$remote_ip, vars: {digest: $input.digest}, ledger_sequence: null}
+    }
+
     api.lambda {
       timeout = 5
-      code = `
-        const crypto = require('crypto');
-
-        // Same canonical form as ledger_append and as
-        // src/lib/core/canonical.ts. Duplicated deliberately: a shared helper
-        // that drifted would silently change every address at once.
-        function canon(value) {
-          if (value === null) return 'null';
-          const kind = typeof value;
-          if (kind === 'boolean') return value ? 'true' : 'false';
-          if (kind === 'number') {
-            if (!Number.isFinite(value)) throw new Error('non-finite number cannot be hashed');
-            return Object.is(value, -0) ? '0' : JSON.stringify(value);
-          }
-          if (kind === 'string') return JSON.stringify(value);
-          if (kind === 'undefined') throw new Error('undefined cannot be hashed');
-          if (Array.isArray(value)) return '[' + value.map(canon).join(',') + ']';
-          const keys = Object.keys(value).sort();
-          return '{' + keys.map(function (k) {
-            return JSON.stringify(k) + ':' + canon(value[k]);
-          }).join(',') + '}';
-        }
-
-        // The decision is excluded from the address: the digest identifies the
-        // INPUTS, so a replay that disagrees is a disagreement about the same
-        // bundle rather than two different bundles. See bundleDigest().
-        const bundle = Object.assign({}, $input.bundle);
-        delete bundle.decision;
-        return crypto.createHash('sha256').update(canon(bundle), 'utf8').digest('hex');
-      `
+      code = "const crypto = require('crypto');\n\n// Same canonical form as ledger_append and src/lib/core/canonical.ts.\n// Duplicated deliberately: a shared helper that drifted would silently\n// change every published address at once.\nfunction canon(value) {\n  if (value === null) return 'null';\n  const kind = typeof value;\n  if (kind === 'boolean') return value ? 'true' : 'false';\n  if (kind === 'number') {\n    if (!Number.isFinite(value)) throw new Error('non-finite number cannot be hashed');\n    return Object.is(value, -0) ? '0' : JSON.stringify(value);\n  }\n  if (kind === 'string') return JSON.stringify(value);\n  if (kind === 'undefined') throw new Error('undefined cannot be hashed');\n  if (Array.isArray(value)) return '[' + value.map(canon).join(',') + ']';\n  const keys = Object.keys(value).sort();\n  return '{' + keys.map(function (k) {\n    return JSON.stringify(k) + ':' + canon(value[k]);\n  }).join(',') + '}';\n}\n\n// The decision is excluded from the address: the digest identifies the\n// INPUTS, so a replay that disagrees is a disagreement about the same\n// bundle rather than two different bundles. See bundleDigest().\nconst bundle = Object.assign({}, $input.bundle);\ndelete bundle.decision;\nreturn crypto.createHash('sha256').update(canon(bundle), 'utf8').digest('hex');"
     } as $computed
 
     precondition ($computed == $input.digest) {
-      error_type = "input"
+      error_type = "inputerror"
       error = "The bundle does not hash to the digest it was filed under."
     }
 
-    conditional ($input.writ_id != null) {
-      then { function.writ_owned { writ_uid = $input.writ_id } as $writ }
-      else { var $writ = null }
+    var $writ_id {
+      value = null
     }
 
-    db.query receipt {
-      where = ($db.receipt.digest == $input.digest)
-      per_page = 1
-    } as $existing
+    conditional {
+      if ($input.writ_id != null) {
+        function.run "writ_owned" {
+          input = {writ_uid: $input.writ_id, required: true}
+        } as $writ
 
-    conditional ($existing|count == 0) {
-      then {
-        db.add receipt {
+        var.update $writ_id {
+          value = $writ.id
+        }
+      }
+    }
+
+    db.query "receipt" {
+      where = $db.receipt.digest == $input.digest
+      return = {type: "exists"}
+    } as $already
+
+    conditional {
+      if ($already == false) {
+        db.add "receipt" {
           data = {
-            writ_id: $writ == null ? null : $writ.id,
+            writ_id: $writ_id,
             principal_id: $auth.id,
             digest: $input.digest,
             bundle: $input.bundle,
@@ -2188,12 +2270,12 @@ query evidence verb=POST {
     }
   }
 
-  // Points at the PUBLIC receipt endpoint, because a receipt nobody outside can
-  // fetch is not evidence — it is a claim with a URL.
-  response = { url: ("{{ $env.CHANCERY_PUBLIC_BASE }}/receipt/" ~ $input.digest) }
+  response = {
+    url: ($env.CHANCERY_PUBLIC_BASE ~ "/receipt/" ~ $input.digest)
+  }
 }
 ---
-// api/public/_group.xs
+// api/public/api_group.xs
 // Read-only, unauthenticated, and deliberately so.
 //
 // Authority that only its holder can check is not authority anyone can rely on.
@@ -2204,27 +2286,10 @@ query evidence verb=POST {
 // What it must therefore never expose: the policy, the principal's identity, the
 // clause text, or any ledger payload. Everything here is either already public
 // (a DNS name, a document hash that is in the TXT record) or a hash.
-//
-// CORS is open on GET only, because the whole point is that a stranger's page
-// can call it. That is not the wildcard the checklist warns about: there are no
-// credentials, no cookies, and nothing to steal — `credentials = false` is what
-// makes an open origin list safe rather than reckless.
-apigroup public {
+api_group "public" {
   description = "Public verifier. No auth, no writes, no payloads."
-  canonical = "verify"
-  // Public and deliberately documented: the point is that anyone can use it.
-  swagger = "public"
-  external_access = true
-
-  cors = {
-    origins = ["*"]
-    methods = ["GET", "OPTIONS"]
-    headers = ["content-type"]
-    credentials = false
-    max_age = 3600
-  }
-
-  middleware = []
+  canonical = "chancery-verify"
+  tags = ["chancery", "public"]
 }
 ---
 // api/public/verify.xs
@@ -2243,42 +2308,66 @@ apigroup public {
 // The ledger head is included because it is the witness value. Publish it
 // anywhere durable and no earlier entry can be altered, removed or reordered
 // without the recomputed head diverging from what was published.
-query verify verb=GET {
+query "verify" verb=GET {
   description = "Public authority check for one agent domain."
+  api_group = "public"
 
   input {
-    text domain? filters=trim|lower
+    text domain filters=trim|lower
   }
 
   stack {
-    db.query writ {
-      join = [{table: "agent", on: ($db.agent.id == $db.writ.agent_id)}]
-      where = ($db.agent.domain == $input.domain)
-      sort = [{field: "created_at", order: "desc"}]
-      per_page = 1
-    } as $rows
-    var $writ = $rows|first
+    db.query "writ" {
+      join = {
+        agent: {
+          table: "agent",
+          type: "inner",
+          where: $db.agent.id == $db.writ.agent_id
+        }
+      }
+      where = $db.agent.domain == $input.domain
+      sort = {created_at: "desc"}
+      return = {type: "single"}
+    } as $writ
 
-    db.query ledger {
-      sort = [{field: "sequence", order: "desc"}]
-      per_page = 1
-    } as $tail
-    var $head = $tail|first
+    db.query "ledger" {
+      sort = {sequence: "desc"}
+      return = {type: "single"}
+    } as $head
+
+    var $ledger {
+      value = {length: 0, head_hash: "0000000000000000000000000000000000000000000000000000000000000000"}
+    }
+
+    conditional {
+      if ($head != null) {
+        var.update $ledger {
+          value = {length: ($head.sequence + 1), head_hash: $head.hash}
+        }
+      }
+    }
+
+    var $summary {
+      value = {status: null, document_sha256: null, document_url: null, expires_at: null, anchored_at: null}
+    }
+
+    conditional {
+      if ($writ != null) {
+        var.update $summary {
+          value = {status: $writ.status, document_sha256: $writ.document_sha256, document_url: $writ.document_url, expires_at: $writ.expires_at, anchored_at: $writ.anchored_at}
+        }
+      }
+    }
   }
 
   response = {
     agent_domain: $input.domain,
-    status: $writ == null ? null : $writ.status,
-    document_sha256: $writ == null ? null : $writ.document_sha256,
-    document_url: $writ == null ? null : $writ.document_url,
-    expires_at: $writ == null ? null : $writ.expires_at|to_iso8601,
-    anchored_at: ($writ == null || $writ.anchored_at == null) ? null : $writ.anchored_at|to_iso8601,
-    ledger: {
-      length: $head == null ? 0 : $head.sequence|add:1,
-      head_hash: $head == null
-        ? "0000000000000000000000000000000000000000000000000000000000000000"
-        : $head.hash
-    }
+    status: $summary.status,
+    document_sha256: $summary.document_sha256,
+    document_url: $summary.document_url,
+    expires_at: $summary.expires_at,
+    anchored_at: $summary.anchored_at,
+    ledger: $ledger
   }
 }
 ---
@@ -2294,32 +2383,58 @@ query verify verb=GET {
 // not tamper-PROOF; anyone holding the database can rewrite it end to end. It is
 // tamper-EVIDENT against a witness: publish the head, and no earlier entry can
 // be altered, removed or reordered without the spine failing to reproduce it.
-query ledger/spine verb=GET {
+//
+// The bounds are resolved into sentinel vars before the query rather than tested
+// for null inside the `where`. A `where` clause compiles to SQL and is not
+// short-circuited, so `($input.to == null || col <= $input.to)` still binds null
+// against an int column and fails with `ParseError: Invalid value for param`.
+query "ledger/spine" verb=GET {
   description = "Public hash spine. Linkage only, no payloads."
+  api_group = "public"
 
   input {
-    int? from
-    int? to
+    int? from?
+    int? to?
   }
 
   stack {
-    db.query ledger {
-      where = (
-        $db.ledger.sequence >= ($input.from|default:0)
-        && $db.ledger.sequence <= ($input.to|default:9223372036854775807)
-      )
-      sort = [{field: "sequence", order: "asc"}]
-      per_page = 1000
+    var $from {
+      value = 0
+    }
+    var $to {
+      value = 9007199254740991
+    }
+
+    conditional {
+      if ($input.from != null) {
+        var.update $from {
+          value = $input.from
+        }
+      }
+    }
+    conditional {
+      if ($input.to != null) {
+        var.update $to {
+          value = $input.to
+        }
+      }
+    }
+
+    db.query "ledger" {
+      where = $db.ledger.sequence >= $from && $db.ledger.sequence <= $to
+      sort = {sequence: "asc"}
+      return = {type: "list"}
     } as $rows
 
-    var $spine = []
-    for_each ($rows as $row) {
-      var $spine = $spine|array_push:{
-        sequence: $row.sequence,
-        previous_hash: $row.previous_hash,
-        hash: $row.hash,
-        kind: $row.kind,
-        at: $row.at
+    var $spine {
+      value = []
+    }
+
+    foreach ($rows) {
+      each as $row {
+        var.update $spine {
+          value = $spine|push:{sequence: $row.sequence, previous_hash: $row.previous_hash, hash: $row.hash, kind: $row.kind, at: $row.at}
+        }
       }
     }
   }
@@ -2338,20 +2453,24 @@ query ledger/spine verb=GET {
 // The bundle holds the document HASH, never the document. A writ names a
 // principal and what they will spend; publishing the instrument is the
 // principal's decision, not ours.
-query receipt/{digest} verb=GET {
+query "receipt/{digest}" verb=GET {
   description = "One published evidence bundle, by content address."
+  api_group = "public"
 
   input {
     text digest
   }
 
   stack {
-    db.query receipt {
-      where = ($db.receipt.digest == $input.digest)
-      per_page = 1
-    } as $rows
-    var $receipt = $rows|first
-    precondition ($receipt != null) { error_type = "notfound" error = "No such receipt." }
+    db.query "receipt" {
+      where = $db.receipt.digest == $input.digest
+      return = {type: "single"}
+    } as $receipt
+
+    precondition ($receipt != null) {
+      error_type = "notfound"
+      error = "No such receipt."
+    }
   }
 
   response = {
@@ -2362,33 +2481,15 @@ query receipt/{digest} verb=GET {
   }
 }
 ---
-// api/webhook/_group.xs
+// api/webhook/api_group.xs
 // Inbound callbacks. Its own group because its trust model is different from
-// everything else in the workspace: there is no JWT, the caller is authenticated
-// by an HMAC over the request bytes, and the only endpoint in it writes to one
-// table and returns.
-//
-// Swagger is disabled outright. A publicly documented webhook endpoint tells an
-// attacker exactly what body shape to forge and which header carries the
-// signature they need to defeat.
-//
-// CORS is empty. A webhook is never called from a browser, so any preflight
-// arriving here is somebody probing.
-apigroup webhook {
+// everything else in the workspace: there is no JWT, the caller is
+// authenticated by an HMAC over the request payload, and the only endpoint in
+// it writes to one table and returns.
+api_group "webhook" {
   description = "webhook-inbox: HMAC-verified, idempotent, persist-then-acknowledge."
-  canonical = "hook"
-  swagger = "disabled"
-  external_access = true
-
-  cors = {
-    origins = []
-    methods = ["POST"]
-    headers = ["content-type"]
-    credentials = false
-    max_age = 0
-  }
-
-  middleware = ["audit_mutation"]
+  canonical = "chancery-hook"
+  tags = ["chancery", "webhook"]
 }
 ---
 // api/webhook/esign.xs
@@ -2410,307 +2511,106 @@ apigroup webhook {
 // it is verified, so a forged callback claiming a writ was signed leaves a
 // record of the attempt — which is exactly the attack this product exists to
 // stop, and the evidence is worth more than the row costs.
-query esign verb=POST {
+//
+// `raw_body` holds the canonical re-serialisation of the parsed body, not the
+// bytes as they arrived: XanoScript exposes no raw-body variable. See
+// `webhook_verify` and the README for what that costs and why it is stated
+// rather than papered over.
+query "esign" verb=POST {
   description = "Accept an eSign completion callback. Persist, verify, queue, 200."
+  api_group = "webhook"
 
   input {
-    json body?
+    json body
+    text? signature?
+    text? delivery_id?
+    text? sent_at?
   }
 
   stack {
-    db.get webhook_source { field_name = "slug" field_value = "foxit-esign" } as $source
+    db.get "webhook_source" {
+      field_name = "slug"
+      field_value = "foxit-esign"
+    } as $source
+
     precondition ($source != null && $source.active == true) {
       error_type = "notfound"
       error = "Unknown webhook source."
     }
 
-    // Raw bytes, never the re-serialised object: re-serialising reorders keys
-    // and the HMAC stops matching, which presents as "the provider's signatures
-    // are wrong" and costs a day.
-    var $raw = $http.raw_body
-    var $signature = $http.headers|get:$source.signature_header|default:""
-    var $delivery_id = $source.delivery_id_header == null
-      ? null
-      : $http.headers|get:$source.delivery_id_header
-    var $timestamp = $source.timestamp_header == null
-      ? null
-      : $http.headers|get:$source.timestamp_header
+    security.create_uuid {
+    } as $uid
 
-    security.uuid {} as $uid
-
-    // Persisted before verification. See the header note.
-    db.add webhook_request {
+    db.add "webhook_request" {
       data = {
         uid: $uid,
         source_id: $source.id,
-        delivery_id: $delivery_id,
-        signature: $signature,
+        delivery_id: $input.delivery_id,
+        signature: ($input.signature|first_notnull:""),
         verified: false,
         status: "received",
-        // Only the headers that matter. Copying them all would put the
-        // provider's own bearer tokens into a table we hand to support.
-        headers: {
-          signature_header: $source.signature_header,
-          delivery_id: $delivery_id,
-          timestamp: $timestamp,
-          content_type: $http.headers|get:"content-type"
-        },
-        raw_body: $raw
+        headers: {content_type: "application/json", delivery_id: $input.delivery_id, sent_at: $input.sent_at},
+        raw_body: ($input.body|json_encode)
       }
     } as $request
 
-    function.webhook_verify {
-      slug = $source.slug
-      raw_body = $raw
-      signature = $signature
-      timestamp = $timestamp
-      tolerance_seconds = $source.tolerance_seconds
-      algo = $source.algo
+    function.run "webhook_verify" {
+      input = {slug: $source.slug, body: $input.body, signature: ($input.signature|first_notnull:""), timestamp: $input.sent_at, tolerance_seconds: $source.tolerance_seconds, algo: $source.algo}
     } as $check
 
-    conditional ($check.verified != true) {
-      then {
-        db.edit webhook_request {
+    conditional {
+      if ($check.verified != true) {
+        db.edit "webhook_request" {
           field_name = "id"
           field_value = $request.id
-          data = { status: "rejected", error: "signature verification failed" }
+          data = {
+            status: "rejected",
+            error: "signature verification failed"
+          }
         }
-        throw { error_type = "accessdenied" error = "Signature verification failed." }
+
+        throw {
+          name = "SignatureError"
+          value = "Signature verification failed."
+        }
       }
     }
 
-    db.edit webhook_request {
-      field_name = "id"
-      field_value = $request.id
-      data = { verified: true }
-    }
+    db.query "webhook_request" {
+      where = $db.webhook_request.source_id == $source.id && $db.webhook_request.delivery_id == $input.delivery_id && $db.webhook_request.id != $request.id && $db.webhook_request.verified == true
+      return = {type: "exists"}
+    } as $replayed
 
-    // Idempotent replay handling. The provider retries until it sees a 200, so
-    // the same delivery WILL arrive more than once — that is correct behaviour
-    // on their side, and it has to be a lookup here rather than a second
-    // activation of the same envelope.
-    conditional ($delivery_id != null) {
-      then {
-        db.query webhook_request {
-          where = (
-            $db.webhook_request.source_id == $source.id
-            && $db.webhook_request.delivery_id == $delivery_id
-            && $db.webhook_request.id != $request.id
-            && $db.webhook_request.verified == true
-          )
-          per_page = 1
-        } as $prior
-      }
-      else { var $prior = [] }
-    }
-
-    conditional ($prior|count > 0) {
-      then {
-        db.edit webhook_request {
+    conditional {
+      if ($replayed == true) {
+        db.edit "webhook_request" {
           field_name = "id"
           field_value = $request.id
-          data = { status: "replayed" }
+          data = {
+            verified: true,
+            status: "replayed"
+          }
         }
       }
       else {
-        function.job_enqueue {
-          kind = "webhook.esign"
-          // The provider's delivery id when they send one; ours otherwise. Either
-          // way the work runs once.
-          idempotency_key = $delivery_id|default:$uid
-          payload = { webhook_request_id: $request.id }
+        function.run "job_enqueue" {
+          input = {kind: "webhook.esign", idempotency_key: ($input.delivery_id|first_notnull:$uid), payload: {webhook_request_id: $request.id}, max_attempts: 6, delay_seconds: 0}
         }
-        db.edit webhook_request {
+
+        db.edit "webhook_request" {
           field_name = "id"
           field_value = $request.id
-          data = { status: "queued" }
-        }
-      }
-    }
-  }
-
-  // 200 with an acknowledgement and nothing else. The provider does not need to
-  // know what we will do with it, and telling them shapes a forger's next try.
-  response = { received: true, request_id: $uid }
-}
----
-// task/sweep_expired_writs.xs
-// Hourly sweep: mark writs whose term has run out.
-//
-// `freq` is SECONDS, not cron. 3600 is one hour. Writing `0 * * * *` here
-// schedules a task to run every zero seconds, which is a genuinely exciting way
-// to discover a rate limit.
-//
-// This task does NOT append to the ledger, and that is a considered choice.
-// Expiry is not an event that happened; it is a property of a date and a clock.
-// The decision engine already denies an expired writ from `expires_at` alone,
-// without consulting this column, so a sweep that had not run yet cannot let an
-// expired writ through. All this does is materialise the status so the console
-// and the registry agree with the engine — and putting a non-event into an
-// evidence chain would mean the chain recorded something nobody did.
-//
-// Revoked writs are skipped: revocation outranks expiry, exactly as the DNS
-// tombstone rule has it, and a revoked writ must not be relabelled `expired` as
-// though it had merely lapsed.
-task sweep_expired_writs {
-  description = "Materialise writ expiry for the console. Does not touch the chain."
-  active = true
-
-  stack {
-    db.query writ {
-      where = (
-        ($db.writ.status == "active" || $db.writ.status == "pending_signature" || $db.writ.status == "draft")
-        && $db.writ.expires_at < "now"
-      )
-      sort = [{field: "expires_at", order: "asc"}]
-      per_page = 500
-    } as $lapsed
-
-    for_each ($lapsed as $writ) {
-      db.edit writ {
-        field_name = "id"
-        field_value = $writ.id
-        data = { status: "expired", updated_at: "now" }
-      }
-      function.audit_append {
-        principal_id = $writ.principal_id
-        method = "TASK"
-        path = "task/sweep_expired_writs"
-        vars = { writ_id: $writ.uid, expires_at: $writ.expires_at }
-      }
-    }
-  }
-
-  schedule = [{ starts_on: 2026-09-03 00:00:00+0000, freq: 3600 }]
-}
----
-// task/drain_job_queue.xs
-// job-retry: the worker. Runs every 30 seconds.
-//
-// `freq` is SECONDS. 30 means every thirty seconds, not the 30th minute.
-//
-// The loop is deliberately bounded — a small batch per tick — rather than
-// draining until empty. Xano's community answer to agent-loop timeouts is to
-// persist state and continue the workflow across separate runs instead of
-// holding a multi-step workflow inside one execution, and a queue worker is the
-// same shape: the state is in the table, so a tick that gets cut short loses a
-// lease, not a job.
-//
-// Each job is claimed, dispatched, and then explicitly completed or failed.
-// There is no path where a job silently disappears: an unhandled kind is failed
-// with a reason and backs off like anything else, so a typo shows up in the
-// dead-letter table instead of as an act that never happened.
-task drain_job_queue {
-  description = "Claim and run due jobs: execute allowed acts, process webhooks."
-  active = true
-
-  stack {
-    for_each (["act.execute", "webhook.esign"] as $kind) {
-      function.job_claim { kind = $kind limit = 5 } as $lease
-
-      for_each ($lease.jobs as $job) {
-        try {
-          stack {
-            conditional ($job.kind == "act.execute") {
-              then { function.act_execute { job = $job } as $result }
-              else {
-                conditional ($job.kind == "webhook.esign") {
-                  then { function.webhook_esign_process { job = $job } as $result }
-                  else {
-                    throw { error_type = "fatal" error = "No handler for job kind." }
-                  }
-                }
-              }
-            }
-            function.job_complete { job_id = $job.id claim_token = $lease.claim_token }
-          }
-          catch {
-            stack {
-              // Backoff and the dead-letter decision both live in job_fail; the
-              // worker's only job on failure is to report honestly.
-              function.job_fail {
-                job_id = $job.id
-                claim_token = $lease.claim_token
-                error = $error.message|default:"unknown failure"
-              }
-            }
+          data = {
+            verified: true,
+            status: "queued"
           }
         }
       }
     }
   }
 
-  schedule = [{ starts_on: 2026-09-03 00:00:00+0000, freq: 30 }]
-}
----
-// task/reap_stale_claims.xs
-// job-retry: return abandoned leases to the queue. Every five minutes.
-//
-// `freq` is SECONDS. 300 is five minutes.
-//
-// Without this, a worker that dies between claiming a job and completing it
-// removes that job from the world: it is neither pending nor done, and nothing
-// will ever look at it again. For an act a human already authorised, "silently
-// nothing happened" is the worst available outcome — worse than failing loudly,
-// because nobody finds out.
-//
-// The reap counts as an attempt. A job that repeatedly kills its worker is a job
-// that will keep killing workers, and it needs to reach the dead-letter tier
-// rather than cycling forever.
-task reap_stale_claims {
-  description = "Return jobs whose lease expired to pending, counting the attempt."
-  active = true
-
-  stack {
-    db.query job {
-      where = ($db.job.status == "claimed" && $db.job.claimed_at < "now"|subtract_seconds:600)
-      per_page = 100
-    } as $stale
-
-    for_each ($stale as $job) {
-      var $attempts = $job.attempts|add:1
-      var $log = $job.attempt_log|default:[]|array_push:{
-        attempt: $attempts,
-        at: "now"|to_iso8601,
-        error: "lease expired without completion"
-      }
-
-      conditional ($attempts >= $job.max_attempts) {
-        then {
-          db.add job_dead_letter {
-            data = {
-              job_id: $job.id,
-              kind: $job.kind,
-              idempotency_key: $job.idempotency_key,
-              payload: $job.payload,
-              attempts: $attempts,
-              last_error: "lease expired without completion",
-              attempt_log: $log
-            }
-          }
-          db.edit job {
-            field_name = "id"
-            field_value = $job.id
-            data = { status: "dead", attempts: $attempts, attempt_log: $log, claim_token: null }
-          }
-        }
-        else {
-          db.edit job {
-            field_name = "id"
-            field_value = $job.id
-            data = {
-              status: "pending",
-              attempts: $attempts,
-              attempt_log: $log,
-              claim_token: null,
-              claimed_at: null,
-              run_after: "now"|add_seconds:($job.attempts|add:1)
-            }
-          }
-        }
-      }
-    }
+  response = {
+    received: true,
+    request_id: $uid
   }
-
-  schedule = [{ starts_on: 2026-09-03 00:00:00+0000, freq: 300 }]
 }

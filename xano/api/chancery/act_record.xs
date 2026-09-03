@@ -5,15 +5,18 @@
 // diligence, and packaged into a receipt. A second place that could produce a
 // verdict is a second place that could produce a different one.
 //
-// Writing this row fires the `act_recorded` trigger, which is what keeps the
-// consumed-budget counters on `writ` honest no matter which path wrote the act —
-// this endpoint, the queue worker, or a human in the Xano UI.
-query writ/{writ_uid}/act verb=POST {
+// On a paid plan, writing this row fires the `act_recorded` trigger, which keeps
+// the consumed-budget counters on `writ` honest no matter which path wrote the
+// act. Triggers are Essential-only, so on free those counters simply stay at
+// zero — nothing in the decision path reads them, so the gate is unaffected.
+query "writ/{writ_uid}/act" verb=POST {
   description = "Record one executed act against a writ."
+  api_group = "chancery"
+  auth = "principal"
 
   input {
     text writ_uid
-    enum kind? {
+    enum kind {
       values = [
         "domain.register",
         "domain.renew",
@@ -23,28 +26,36 @@ query writ/{writ_uid}/act verb=POST {
         "document.publish"
       ]
     }
-    text grant_ref?
-    int amount_minor_units?=0
-    text currency?="USD"
-    timestamp executed_at?
-    text? reference
-    json? fields
-    text? evidence_digest
+    text? grant_ref?
+    int? amount_minor_units?
+    text? currency?
+    timestamp executed_at
+    text? reference?
+    json? fields?
+    text? evidence_digest?
   }
 
   stack {
-    function.writ_owned { writ_uid = $input.writ_uid } as $writ
+    function.run "audit_append" {
+      input = {principal_id: $auth.id, method: "POST", path: "writ/{writ_uid}/act", ip: $env.$remote_ip, vars: {writ_uid: $input.writ_uid, kind: $input.kind}, ledger_sequence: null}
+    }
 
-    security.uuid {} as $uid
-    db.add act {
+    function.run "writ_owned" {
+      input = {writ_uid: $input.writ_uid, required: true}
+    } as $writ
+
+    security.create_uuid {
+    } as $uid
+
+    db.add "act" {
       data = {
         uid: $uid,
         writ_id: $writ.id,
         kind: $input.kind,
-        grant_ref: $input.grant_ref|default:"",
-        fields: $input.fields|default:{},
-        amount_minor_units: $input.amount_minor_units,
-        currency: $input.currency,
+        grant_ref: ($input.grant_ref|first_notnull:""),
+        fields: ($input.fields|first_notnull:{}),
+        amount_minor_units: ($input.amount_minor_units|first_notnull:0),
+        currency: ($input.currency|first_notnull:"USD"),
         outcome: "allow",
         executed: true,
         reference: $input.reference,
@@ -54,5 +65,8 @@ query writ/{writ_uid}/act verb=POST {
     } as $act
   }
 
-  response = { recorded: true, act_id: $act.uid }
+  response = {
+    recorded: true,
+    act_id: $act.uid
+  }
 }

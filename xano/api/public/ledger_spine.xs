@@ -9,32 +9,58 @@
 // not tamper-PROOF; anyone holding the database can rewrite it end to end. It is
 // tamper-EVIDENT against a witness: publish the head, and no earlier entry can
 // be altered, removed or reordered without the spine failing to reproduce it.
-query ledger/spine verb=GET {
+//
+// The bounds are resolved into sentinel vars before the query rather than tested
+// for null inside the `where`. A `where` clause compiles to SQL and is not
+// short-circuited, so `($input.to == null || col <= $input.to)` still binds null
+// against an int column and fails with `ParseError: Invalid value for param`.
+query "ledger/spine" verb=GET {
   description = "Public hash spine. Linkage only, no payloads."
+  api_group = "public"
 
   input {
-    int? from
-    int? to
+    int? from?
+    int? to?
   }
 
   stack {
-    db.query ledger {
-      where = (
-        $db.ledger.sequence >= ($input.from|default:0)
-        && $db.ledger.sequence <= ($input.to|default:9223372036854775807)
-      )
-      sort = [{field: "sequence", order: "asc"}]
-      per_page = 1000
+    var $from {
+      value = 0
+    }
+    var $to {
+      value = 9007199254740991
+    }
+
+    conditional {
+      if ($input.from != null) {
+        var.update $from {
+          value = $input.from
+        }
+      }
+    }
+    conditional {
+      if ($input.to != null) {
+        var.update $to {
+          value = $input.to
+        }
+      }
+    }
+
+    db.query "ledger" {
+      where = $db.ledger.sequence >= $from && $db.ledger.sequence <= $to
+      sort = {sequence: "asc"}
+      return = {type: "list"}
     } as $rows
 
-    var $spine = []
-    for_each ($rows as $row) {
-      var $spine = $spine|array_push:{
-        sequence: $row.sequence,
-        previous_hash: $row.previous_hash,
-        hash: $row.hash,
-        kind: $row.kind,
-        at: $row.at
+    var $spine {
+      value = []
+    }
+
+    foreach ($rows) {
+      each as $row {
+        var.update $spine {
+          value = $spine|push:{sequence: $row.sequence, previous_hash: $row.previous_hash, hash: $row.hash, kind: $row.kind, at: $row.at}
+        }
       }
     }
   }

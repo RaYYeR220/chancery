@@ -11,7 +11,7 @@
 // failed six times over an hour is not a transient failure, and this product's
 // entire posture is that a machine does not decide on its own to try an
 // irreversible thing again.
-function job_fail {
+function "job_fail" {
   description = "Record a failed attempt, back off, or dead-letter."
 
   input {
@@ -21,23 +21,36 @@ function job_fail {
   }
 
   stack {
-    db.get job { field_name = "id" field_value = $input.job_id } as $job
-    precondition ($job != null) { error_type = "notfound" error = "No such job." }
+    db.get "job" {
+      field_name = "id"
+      field_value = $input.job_id
+    } as $job
+
+    precondition ($job != null) {
+      error_type = "notfound"
+      error = "No such job."
+    }
+
     precondition ($job.claim_token == $input.claim_token) {
       error_type = "accessdenied"
       error = "This lease is no longer held."
     }
 
-    var $attempts = $job.attempts|add:1
-    var $log = $job.attempt_log|default:[]|array_push:{
-      attempt: $attempts,
-      at: "now"|to_iso8601,
-      error: $input.error
+    var $attempts {
+      value = $job.attempts + 1
     }
 
-    conditional ($attempts >= $job.max_attempts) {
-      then {
-        db.add job_dead_letter {
+    var $log {
+      value = ($job.attempt_log|first_notnull:[])|push:{attempt: $attempts, at: now, error: $input.error}
+    }
+
+    var $updated {
+      value = null
+    }
+
+    conditional {
+      if ($attempts >= $job.max_attempts) {
+        db.add "job_dead_letter" {
           data = {
             job_id: $job.id,
             kind: $job.kind,
@@ -48,7 +61,8 @@ function job_fail {
             attempt_log: $log
           }
         }
-        db.edit job {
+
+        db.edit "job" {
           field_name = "id"
           field_value = $job.id
           data = {
@@ -58,16 +72,19 @@ function job_fail {
             attempt_log: $log,
             claim_token: null
           }
-        } as $updated
+        } as $dead
+
+        var.update $updated {
+          value = $dead
+        }
       }
       else {
-        // Full jitter: uniform in [0, 2^attempts) seconds, floored at one second
-        // so the first retry is not instant.
-        var $ceiling = 2|pow:$attempts
-        security.random_number { min = 0 max = $ceiling } as $jitter
-        var $delay = $jitter|max:1
+        security.random_number {
+          min = 0
+          max = (2|pow:$attempts)
+        } as $jitter
 
-        db.edit job {
+        db.edit "job" {
           field_name = "id"
           field_value = $job.id
           data = {
@@ -77,9 +94,13 @@ function job_fail {
             attempt_log: $log,
             claim_token: null,
             claimed_at: null,
-            run_after: "now"|add_seconds:$delay
+            run_after: ((now|to_ms) + (($jitter|num_max:1) * 1000))
           }
-        } as $updated
+        } as $backed_off
+
+        var.update $updated {
+          value = $backed_off
+        }
       }
     }
   }

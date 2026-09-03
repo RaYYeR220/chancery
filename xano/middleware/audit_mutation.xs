@@ -1,10 +1,7 @@
-// Append an audit row for every mutating call. Attached to every API group.
-//
-// Two decisions worth stating.
-//
-// Reads are not logged. They happen constantly, they prove nothing, and burying
-// the twelve state changes of the day under forty thousand GETs is how an audit
-// log becomes something nobody reads.
+// 💳 PAID TIER. Excluded from the free-tier push; see `require_auth`. On free
+// the same rows are written by an explicit `function.run "audit_append"` at the
+// top of every mutating endpoint, which is the identical work without the
+// centralisation.
 //
 // `exception_policy = "critical"`, so a call whose audit row cannot be written
 // fails. That is the uncomfortable choice and it is deliberate: Chancery fails
@@ -15,34 +12,24 @@
 //
 // This is the access log, not the chain. The ledger records what Chancery
 // DECIDED and is published; this records who called what and stays private.
-middleware audit_mutation {
+middleware "audit_mutation" {
+  description = "Append an audit row for every mutating call."
+  exception_policy = "critical"
+  response_strategy = "merge"
+
   input {
-    json vars
-    enum type { values = ["pre", "post"] }
+    json request_data
   }
 
   stack {
-    // Post, so the row records a call that actually reached its stack, and so a
-    // request rejected by `require_auth` is not logged as an attempted mutation
-    // by a principal that was never authenticated.
-    conditional (
-      $type == "post"
-      && ($request.method == "POST" || $request.method == "PATCH" || $request.method == "PUT" || $request.method == "DELETE")
-    ) {
-      then {
-        function.audit_append {
-          principal_id = $auth.id
-          method = $request.method
-          path = $request.path
-          ip = $request.ip
-          // Xano's `password` type is not readable back out of a request var, so
-          // signup and login inputs arrive here already redacted.
-          vars = $vars
+    conditional {
+      if ($env.$request_method == "POST" || $env.$request_method == "PATCH" || $env.$request_method == "PUT" || $env.$request_method == "DELETE") {
+        function.run "audit_append" {
+          input = {principal_id: $auth.id, method: $env.$request_method, path: $env.$request_uri, ip: $env.$remote_ip, vars: $input.request_data, ledger_sequence: null}
         }
       }
     }
   }
 
-  response_strategy = "merge"
-  exception_policy = "critical"
+  response = null
 }

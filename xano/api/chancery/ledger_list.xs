@@ -9,52 +9,64 @@
 // hashed: it is an index for this query, not evidence. Anyone who wants to
 // verify the chain's integrity across principals uses `/ledger/spine` in the
 // public group, which returns linkage without payloads.
-query ledger verb=GET {
+//
+// The filter is TWO queries rather than one with `($uid == null || col == $uid)`.
+// A `where` clause compiles to SQL and is not short-circuited in XanoScript, so
+// the null branch still binds null against an indexed column and the request
+// dies with `ParseError: Invalid value for param`. Branching in the stack is the
+// only reliable way to make a filter optional.
+query "ledger" verb=GET {
   description = "The caller's ledger entries, oldest first."
+  api_group = "chancery"
+  auth = "principal"
 
   input {
-    text? writ_id
-    int? after_sequence
-    int? per_page
+    text? writ_id?
   }
 
   stack {
-    conditional ($input.writ_id != null) {
-      then {
-        // Verified, not trusted: without this a caller could read any writ's
-        // chain by guessing a uid.
-        function.writ_owned { writ_uid = $input.writ_id } as $writ
-        db.query ledger {
-          where = (
-            $db.ledger.writ_id == $writ.uid
-            && $db.ledger.principal_id == $auth.id
-            && $db.ledger.sequence > ($input.after_sequence|default:-1)
-          )
-          sort = [{field: "sequence", order: "asc"}]
-          per_page = $input.per_page|default:250
-        } as $rows
+    var $rows {
+      value = []
+    }
+
+    conditional {
+      if ($input.writ_id != null) {
+        function.run "writ_owned" {
+          input = {writ_uid: $input.writ_id, required: true}
+        } as $writ
+
+        db.query "ledger" {
+          where = $db.ledger.principal_id == $auth.id && $db.ledger.writ_id == $writ.uid
+          sort = {sequence: "asc"}
+          return = {type: "list"}
+        } as $scoped
+
+        var.update $rows {
+          value = $scoped
+        }
       }
       else {
-        db.query ledger {
-          where = (
-            $db.ledger.principal_id == $auth.id
-            && $db.ledger.sequence > ($input.after_sequence|default:-1)
-          )
-          sort = [{field: "sequence", order: "asc"}]
-          per_page = $input.per_page|default:250
-        } as $rows
+        db.query "ledger" {
+          where = $db.ledger.principal_id == $auth.id
+          sort = {sequence: "asc"}
+          return = {type: "list"}
+        } as $all
+
+        var.update $rows {
+          value = $all
+        }
       }
     }
 
-    var $entries = []
-    for_each ($rows as $row) {
-      var $entries = $entries|array_push:{
-        sequence: $row.sequence,
-        previous_hash: $row.previous_hash,
-        hash: $row.hash,
-        kind: $row.kind,
-        at: $row.at,
-        payload: $row.payload
+    var $entries {
+      value = []
+    }
+
+    foreach ($rows) {
+      each as $row {
+        var.update $entries {
+          value = $entries|push:{sequence: $row.sequence, previous_hash: $row.previous_hash, hash: $row.hash, kind: $row.kind, at: $row.at, payload: $row.payload}
+        }
       }
     }
   }

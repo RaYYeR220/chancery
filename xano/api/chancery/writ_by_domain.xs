@@ -1,4 +1,4 @@
-// GET /writ/by_domain?domain= — getWritByAgentDomain
+// GET /writ_by_domain?domain= — getWritByAgentDomain
 //
 // This is the lookup the gate makes on every single act, so its resolution rule
 // is load-bearing: **newest first, whatever the status.**
@@ -7,28 +7,50 @@
 // needs to answer WRIT_REVOKED rather than NO_WRIT, and those are very different
 // things to tell a principal — one says "your authority was withdrawn", the
 // other says "you never had any", and only the first is true.
-query writ/by_domain verb=GET {
+//
+// The name is `writ_by_domain`, not `writ/by_domain`, and that is not a style
+// choice. Xano matches `writ/{writ_uid}` FIRST — a literal segment does not beat
+// a path parameter — so `GET /writ/by_domain` resolved to the by-uid endpoint
+// with `writ_uid = "by_domain"`, which then failed comparing a non-uuid against
+// the `uuid` column: `ParseError: Invalid value for param "writ.uid"`. Keeping
+// the two off a shared prefix is the only reliable fix.
+query "writ_by_domain" verb=GET {
   description = "The current writ for an agent domain, scoped to the caller."
+  api_group = "chancery"
+  auth = "principal"
 
   input {
-    text domain? filters=trim|lower
+    text domain filters=trim|lower
   }
 
   stack {
-    db.query writ {
-      // The join is on the caller's own agents. An agent domain is public
-      // information; the writ behind it is not.
-      join = [{table: "agent", on: ($db.agent.id == $db.writ.agent_id)}]
-      where = ($db.agent.domain == $input.domain && $db.writ.principal_id == $auth.id)
-      sort = [{field: "created_at", order: "desc"}, {field: "id", order: "desc"}]
-      per_page = 1
-    } as $rows
+    db.query "writ" {
+      join = {
+        agent: {
+          table: "agent",
+          type: "inner",
+          where: $db.agent.id == $db.writ.agent_id
+        }
+      }
+      where = $db.agent.domain == $input.domain && $db.writ.principal_id == $auth.id
+      sort = {created_at: "desc"}
+      return = {type: "single"}
+    } as $writ
 
-    var $writ = $rows|first
+    var $assembled {
+      value = null
+    }
 
-    conditional ($writ == null) {
-      then { var $assembled = null }
-      else { function.writ_assemble { writ_id = $writ.id } as $assembled }
+    conditional {
+      if ($writ != null) {
+        function.run "writ_assemble" {
+          input = {writ_id: $writ.id}
+        } as $found
+
+        var.update $assembled {
+          value = $found
+        }
+      }
     }
   }
 

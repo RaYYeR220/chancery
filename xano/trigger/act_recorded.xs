@@ -18,33 +18,46 @@
 // appends inside writes that may still roll back — producing either a gap in
 // the sequence or an entry for an act that never existed. The endpoints append
 // explicitly, in their own transaction, where the ordering is legible.
-table_trigger act_recorded {
+table_trigger "act_recorded" {
   table = "act"
-  actions = ["insert"]
+  actions = {insert: true, update: false, delete: false, truncate: false}
+  active = true
+  description = "Queue allowed acts for execution; keep the writ's budget counters honest."
+
+  input {
+    json new
+    json old
+    enum action {
+      values = ["insert", "update", "delete", "truncate"]
+    }
+    text datasource
+  }
 
   stack {
-    conditional ($new.outcome == "allow" && $new.executed == false) {
-      then {
-        function.job_enqueue {
-          kind = "act.execute"
-          idempotency_key = $new.uid
-          payload = { act_id: $new.id, act_uid: $new.uid, writ_id: $new.writ_id, kind: $new.kind }
+    conditional {
+      if ($input.new.outcome == "allow" && $input.new.executed == false) {
+        function.run "job_enqueue" {
+          input = {kind: "act.execute", idempotency_key: $input.new.uid, payload: {act_id: $input.new.id, act_uid: $input.new.uid, writ_id: $input.new.writ_id, kind: $input.new.kind}, max_attempts: 6, delay_seconds: 0}
         }
       }
     }
 
-    conditional ($new.executed == true) {
-      then {
-        db.get writ { field_name = "id" field_value = $new.writ_id } as $writ
-        conditional ($writ != null) {
-          then {
-            db.edit writ {
+    conditional {
+      if ($input.new.executed == true) {
+        db.get "writ" {
+          field_name = "id"
+          field_value = $input.new.writ_id
+        } as $writ
+
+        conditional {
+          if ($writ != null) {
+            db.edit "writ" {
               field_name = "id"
               field_value = $writ.id
               data = {
-                consumed_count: $writ.consumed_count|add:1,
-                consumed_minor_units: $writ.consumed_minor_units|add:($new.amount_minor_units|default:0),
-                updated_at: "now"
+                consumed_count: ($writ.consumed_count + 1),
+                consumed_minor_units: ($writ.consumed_minor_units + ($input.new.amount_minor_units|first_notnull:0)),
+                updated_at: now
               }
             }
           }

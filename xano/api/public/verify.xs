@@ -13,41 +13,65 @@
 // The ledger head is included because it is the witness value. Publish it
 // anywhere durable and no earlier entry can be altered, removed or reordered
 // without the recomputed head diverging from what was published.
-query verify verb=GET {
+query "verify" verb=GET {
   description = "Public authority check for one agent domain."
+  api_group = "public"
 
   input {
-    text domain? filters=trim|lower
+    text domain filters=trim|lower
   }
 
   stack {
-    db.query writ {
-      join = [{table: "agent", on: ($db.agent.id == $db.writ.agent_id)}]
-      where = ($db.agent.domain == $input.domain)
-      sort = [{field: "created_at", order: "desc"}]
-      per_page = 1
-    } as $rows
-    var $writ = $rows|first
+    db.query "writ" {
+      join = {
+        agent: {
+          table: "agent",
+          type: "inner",
+          where: $db.agent.id == $db.writ.agent_id
+        }
+      }
+      where = $db.agent.domain == $input.domain
+      sort = {created_at: "desc"}
+      return = {type: "single"}
+    } as $writ
 
-    db.query ledger {
-      sort = [{field: "sequence", order: "desc"}]
-      per_page = 1
-    } as $tail
-    var $head = $tail|first
+    db.query "ledger" {
+      sort = {sequence: "desc"}
+      return = {type: "single"}
+    } as $head
+
+    var $ledger {
+      value = {length: 0, head_hash: "0000000000000000000000000000000000000000000000000000000000000000"}
+    }
+
+    conditional {
+      if ($head != null) {
+        var.update $ledger {
+          value = {length: ($head.sequence + 1), head_hash: $head.hash}
+        }
+      }
+    }
+
+    var $summary {
+      value = {status: null, document_sha256: null, document_url: null, expires_at: null, anchored_at: null}
+    }
+
+    conditional {
+      if ($writ != null) {
+        var.update $summary {
+          value = {status: $writ.status, document_sha256: $writ.document_sha256, document_url: $writ.document_url, expires_at: $writ.expires_at, anchored_at: $writ.anchored_at}
+        }
+      }
+    }
   }
 
   response = {
     agent_domain: $input.domain,
-    status: $writ == null ? null : $writ.status,
-    document_sha256: $writ == null ? null : $writ.document_sha256,
-    document_url: $writ == null ? null : $writ.document_url,
-    expires_at: $writ == null ? null : $writ.expires_at|to_iso8601,
-    anchored_at: ($writ == null || $writ.anchored_at == null) ? null : $writ.anchored_at|to_iso8601,
-    ledger: {
-      length: $head == null ? 0 : $head.sequence|add:1,
-      head_hash: $head == null
-        ? "0000000000000000000000000000000000000000000000000000000000000000"
-        : $head.hash
-    }
+    status: $summary.status,
+    document_sha256: $summary.document_sha256,
+    document_url: $summary.document_url,
+    expires_at: $summary.expires_at,
+    anchored_at: $summary.anchored_at,
+    ledger: $ledger
   }
 }

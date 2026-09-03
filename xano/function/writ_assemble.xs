@@ -6,11 +6,12 @@
 // path assembles the instrument, so there is exactly one shape a consumer ever
 // sees and exactly one place to change it.
 //
-// Timestamps go out as ISO-8601 strings. Xano returns `timestamp` columns as
-// epoch milliseconds by default; the decision engine compares dates as strings,
-// so the formatting happens here rather than being left to whichever client
-// remembered.
-function writ_assemble {
+// Timestamps go out as the raw epoch-millisecond column values rather than
+// formatted strings. XanoScript's `format_timestamp` needs escaped literals to
+// emit ISO-8601 and every escape is a chance to silently produce a date the
+// engine cannot parse; the TypeScript adapter already normalises epoch millis to
+// ISO on the way in, so the conversion happens once, in the place that has tests.
+function "writ_assemble" {
   description = "Assemble a StoredWrit from writ + principal + agent + clauses."
 
   input {
@@ -18,25 +19,41 @@ function writ_assemble {
   }
 
   stack {
-    db.get writ { field_name = "id" field_value = $input.writ_id } as $writ
-    precondition ($writ != null) { error_type = "notfound" error = "No such writ." }
+    db.get "writ" {
+      field_name = "id"
+      field_value = $input.writ_id
+    } as $writ
 
-    db.get principal { field_name = "id" field_value = $writ.principal_id } as $principal
-    db.get agent { field_name = "id" field_value = $writ.agent_id } as $agent
+    precondition ($writ != null) {
+      error_type = "notfound"
+      error = "No such writ."
+    }
 
-    db.query clause {
-      where = ($db.clause.writ_id == $writ.id)
-      sort = [{field: "ordinal", order: "asc"}, {field: "id", order: "asc"}]
-      per_page = 200
+    db.get "principal" {
+      field_name = "id"
+      field_value = $writ.principal_id
+    } as $principal
+
+    db.get "agent" {
+      field_name = "id"
+      field_value = $writ.agent_id
+    } as $agent
+
+    db.query "clause" {
+      where = $db.clause.writ_id == $writ.id
+      sort = {ordinal: "asc"}
+      return = {type: "list"}
     } as $clauses
 
-    var $grants = []
-    for_each ($clauses as $clause) {
-      var $grants = $grants|array_push:{
-        ref: $clause.ref,
-        act_kind: $clause.act_kind,
-        limits: $clause.limits,
-        conditions: $clause.conditions
+    var $grants {
+      value = []
+    }
+
+    foreach ($clauses) {
+      each as $clause {
+        var.update $grants {
+          value = $grants|push:{ref: $clause.ref, act_kind: $clause.act_kind, limits: $clause.limits, conditions: $clause.conditions}
+        }
       }
     }
   }
@@ -58,14 +75,14 @@ function writ_assemble {
         public_key: $agent.public_key
       },
       grants: $grants,
-      effective_from: $writ.effective_from|to_iso8601,
-      expires_at: $writ.expires_at|to_iso8601,
+      effective_from: $writ.effective_from,
+      expires_at: $writ.expires_at,
       jurisdiction: $writ.jurisdiction
     },
     document_url: $writ.document_url,
     document_sha256: $writ.document_sha256,
     envelope_id: $writ.envelope_id,
     policy: $writ.policy,
-    anchored_at: $writ.anchored_at == null ? null : $writ.anchored_at|to_iso8601
+    anchored_at: $writ.anchored_at
   }
 }

@@ -10,26 +10,34 @@
 // its own content address could publish one bundle under the name of another,
 // and every citation of that address would then point at evidence for a
 // different decision.
-query evidence verb=POST {
+query "evidence" verb=POST {
   description = "Publish an evidence bundle at its content address."
+  api_group = "chancery"
+  auth = "principal"
 
   input {
-    text digest?
-    json bundle?
-    text? writ_id
-    enum outcome? { values = ["allow", "deny"] }
-    text evaluated_at?
+    text digest
+    json bundle
+    text? writ_id?
+    enum outcome {
+      values = ["allow", "deny"]
+    }
+    text evaluated_at
   }
 
   stack {
+    function.run "audit_append" {
+      input = {principal_id: $auth.id, method: "POST", path: "evidence", ip: $env.$remote_ip, vars: {digest: $input.digest}, ledger_sequence: null}
+    }
+
     api.lambda {
       timeout = 5
       code = `
         const crypto = require('crypto');
 
-        // Same canonical form as ledger_append and as
-        // src/lib/core/canonical.ts. Duplicated deliberately: a shared helper
-        // that drifted would silently change every address at once.
+        // Same canonical form as ledger_append and src/lib/core/canonical.ts.
+        // Duplicated deliberately: a shared helper that drifted would silently
+        // change every published address at once.
         function canon(value) {
           if (value === null) return 'null';
           const kind = typeof value;
@@ -57,25 +65,36 @@ query evidence verb=POST {
     } as $computed
 
     precondition ($computed == $input.digest) {
-      error_type = "input"
+      error_type = "inputerror"
       error = "The bundle does not hash to the digest it was filed under."
     }
 
-    conditional ($input.writ_id != null) {
-      then { function.writ_owned { writ_uid = $input.writ_id } as $writ }
-      else { var $writ = null }
+    var $writ_id {
+      value = null
     }
 
-    db.query receipt {
-      where = ($db.receipt.digest == $input.digest)
-      per_page = 1
-    } as $existing
+    conditional {
+      if ($input.writ_id != null) {
+        function.run "writ_owned" {
+          input = {writ_uid: $input.writ_id, required: true}
+        } as $writ
 
-    conditional ($existing|count == 0) {
-      then {
-        db.add receipt {
+        var.update $writ_id {
+          value = $writ.id
+        }
+      }
+    }
+
+    db.query "receipt" {
+      where = $db.receipt.digest == $input.digest
+      return = {type: "exists"}
+    } as $already
+
+    conditional {
+      if ($already == false) {
+        db.add "receipt" {
           data = {
-            writ_id: $writ == null ? null : $writ.id,
+            writ_id: $writ_id,
             principal_id: $auth.id,
             digest: $input.digest,
             bundle: $input.bundle,
@@ -87,7 +106,7 @@ query evidence verb=POST {
     }
   }
 
-  // Points at the PUBLIC receipt endpoint, because a receipt nobody outside can
-  // fetch is not evidence — it is a claim with a URL.
-  response = { url: ("{{ $env.CHANCERY_PUBLIC_BASE }}/receipt/" ~ $input.digest) }
+  response = {
+    url: ($env.CHANCERY_PUBLIC_BASE ~ "/receipt/" ~ $input.digest)
+  }
 }

@@ -3,13 +3,22 @@
 // Answers only about the token holder. There is no `GET /principal/{id}` in this
 // workspace, because there is no reason for one to exist and every reason for it
 // not to.
-query me verb=GET {
+query "me" verb=GET {
   description = "The authenticated principal."
+  api_group = "chancery"
+  auth = "principal"
+
+  input {
+  }
 
   stack {
-    db.get principal { field_name = "id" field_value = $auth.id } as $principal
+    db.get "principal" {
+      field_name = "id"
+      field_value = $auth.id
+    } as $principal
+
     precondition ($principal != null) {
-      error_type = "unauthorized"
+      error_type = "accessdenied"
       error = "Authentication required."
     }
   }

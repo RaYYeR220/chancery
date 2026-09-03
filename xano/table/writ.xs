@@ -35,12 +35,13 @@ table writ {
     int consumed_minor_units?=0
   }
 
+  // The (status, expires_at) index is the sweep task's exact scan; without it
+  // expiry becomes a full table scan every hour forever. (The note sits above
+  // the block because XanoScript rejects `//` inside an array literal.)
   index = [
     {type: "primary", field: [{name: "id"}]}
     {type: "btree|unique", field: [{name: "uid", op: "asc"}]}
     {type: "btree", field: [{name: "principal_id", op: "asc"}]}
-    // The sweep task scans exactly this pair; without it, expiry becomes a full
-    // table scan every hour forever.
     {type: "btree", field: [{name: "status", op: "asc"}, {name: "expires_at", op: "asc"}]}
     {type: "btree", field: [{name: "agent_id", op: "asc"}, {name: "created_at", op: "desc"}]}
   ]

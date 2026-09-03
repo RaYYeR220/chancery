@@ -10,42 +10,54 @@
 // workers cannot lease the same job. `run_after <= now` is the whole backoff
 // mechanism: a failed job writes its next attempt into the future and simply
 // stops matching this query until then.
-function job_claim {
+function "job_claim" {
   description = "Lease up to `limit` due jobs of one kind."
 
   input {
     text kind
-    int? limit
+    int? limit?
   }
 
   stack {
-    security.uuid {} as $claim_token
+    security.create_uuid {
+    } as $claim_token
+
+    var $claimed {
+      value = []
+    }
 
     db.transaction {
       stack {
-        db.query job {
-          where = (
-            $db.job.kind == $input.kind
-            && $db.job.status == "pending"
-            && $db.job.run_after <= "now"
-          )
-          sort = [{field: "run_after", order: "asc"}, {field: "id", order: "asc"}]
-          per_page = $input.limit|default:10
-          lock = "update|skip_locked"
+        db.query "job" {
+          where = $db.job.kind == $input.kind && $db.job.status == "pending" && $db.job.run_after <= now
+          sort = {run_after: "asc"}
+          lock = true
+          return = {type: "list", paging: {page: 1, per_page: ($input.limit|first_notnull:10)}}
         } as $due
 
-        var $claimed = []
-        for_each ($due as $job) {
-          db.edit job {
-            field_name = "id"
-            field_value = $job.id
-            data = { status: "claimed", claimed_at: "now", claim_token: $claim_token }
-          } as $updated
-          var $claimed = $claimed|array_push:$updated
+        foreach ($due) {
+          each as $job {
+            db.edit "job" {
+              field_name = "id"
+              field_value = $job.id
+              data = {
+                status: "claimed",
+                claimed_at: now,
+                claim_token: $claim_token
+              }
+            } as $updated
+
+            var.update $claimed {
+              value = $claimed|push:$updated
+            }
+          }
         }
       }
     }
   }
 
-  response = { claim_token: $claim_token, jobs: $claimed }
+  response = {
+    claim_token: $claim_token,
+    jobs: $claimed
+  }
 }

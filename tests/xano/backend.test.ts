@@ -20,7 +20,7 @@ import { join, relative, sep } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { MANIFEST, SEPARATOR, XANO_DIR, buildMultidoc } from "../../scripts/xano-push";
+import { MANIFEST, SEPARATOR, XANO_DIR, buildMultidoc, manifestFor } from "../../scripts/xano-push";
 
 function sourceFiles(): string[] {
   const found: string[] = [];
@@ -65,9 +65,21 @@ describe("the multidoc", () => {
 
   it("is not stale relative to the tree", () => {
     // The committed multidoc is what gets pushed. If it drifts from the source
-    // files, the workspace runs something nobody reviewed.
+    // files, the workspace runs something nobody reviewed. It is the FREE-tier
+    // selection, because that is the one that actually deploys.
     const committed = readFileSync(join(XANO_DIR, "multidoc.xs"), "utf8");
-    expect(committed).toBe(buildMultidoc());
+    expect(committed).toBe(buildMultidoc(XANO_DIR, manifestFor(false)));
+  });
+
+  it("excludes the definitions the free plan refuses", () => {
+    // Middleware, triggers and tasks each fail the WHOLE multidoc with a 400 on
+    // the free plan, so one of them slipping into the default selection lands
+    // nothing at all. Learned the hard way; asserted so it stays learned.
+    const free = manifestFor(false);
+    expect(free.some((path) => path.startsWith("middleware/"))).toBe(false);
+    expect(free.some((path) => path.startsWith("trigger/"))).toBe(false);
+    expect(free.some((path) => path.startsWith("task/"))).toBe(false);
+    expect(manifestFor(true)).toEqual(MANIFEST);
   });
 
   it("separates definitions with `---` alone on its own line", () => {
@@ -91,7 +103,7 @@ describe("the multidoc", () => {
 
 describe("declarations", () => {
   const DECLARATION =
-    /^(table|query|function|middleware|task|table_trigger|apigroup)\s+(\S+)/gm;
+    /^(table|query|function|middleware|task|table_trigger|api_group)\s+(\S+)/gm;
 
   it("gives every object a unique (kind, name)", () => {
     const seen = new Set<string>();
@@ -185,47 +197,78 @@ describe("security posture", () => {
     }
   });
 
-  it("references secrets only through {{ $env.X }}", () => {
-    const secretish = /(SECRET|TOKEN|API_KEY|BASIC_AUTH)/;
+  it("references secrets only through $env", () => {
+    // `$env.NAME`, not `{{ $env.NAME }}` — the mustache form is the CLI's
+    // environment-file syntax, not XanoScript's, and it resolves to a literal
+    // string at runtime rather than to the secret.
+    const secretish = /(SECRET|API_KEY|BASIC_AUTH)/;
     for (const [file, source] of SOURCES) {
       for (const line of code(source).split("\n")) {
         if (!secretish.test(line)) continue;
-        // Column names that merely NAME an env var are fine; a value is not.
-        if (/secret_env/.test(line)) continue;
-        expect(line.includes("{{ $env."), `${file}: ${line.trim()}`).toBe(true);
+        // Column names and comments that merely NAME an env var are fine.
+        if (/secret_env|values = /.test(line)) continue;
+        expect(line.includes("$env."), `${file}: ${line.trim()}`).toBe(true);
+        expect(line.includes("{{"), `${file} uses the mustache form: ${line.trim()}`).toBe(false);
       }
     }
   });
 
-  it("never pairs a wildcard origin with credentials", () => {
-    for (const file of FILES.filter((name) => name.endsWith("_group.xs"))) {
-      const body = code(read(file));
-      const wildcard = /origins\s*=\s*\[[^\]]*"\*"/.test(body);
-      const credentials = /credentials\s*=\s*true/.test(body);
-      expect(wildcard && credentials, `${file} allows any origin WITH credentials`).toBe(false);
+  it("gives every API group an instance-unique canonical", () => {
+    // `canonical` routes between WORKSPACES on the instance, not just within
+    // ours, so a bare `auth` or `public` is a collision waiting to happen.
+    const canonicals = FILES.filter((name) => name.endsWith("api_group.xs")).map(
+      (file) => /canonical\s*=\s*"([^"]+)"/.exec(code(read(file)))?.[1],
+    );
+    expect(canonicals).toHaveLength(4);
+    for (const canonical of canonicals) {
+      expect(canonical, "every canonical must be namespaced").toMatch(/^chancery/);
+    }
+    expect(new Set(canonicals).size).toBe(canonicals.length);
+  });
+
+  it("requires a token on every endpoint in the authenticated group", () => {
+    // Middleware is Essential-only, so the group cannot carry the requirement.
+    // Each endpoint declares it instead, and the point of the group existing is
+    // that this holds for ALL of its members with no exception to remember.
+    const endpoints = FILES.filter(
+      (file) => file.startsWith("api/chancery/") && !file.endsWith("api_group.xs"),
+    );
+    expect(endpoints.length).toBeGreaterThan(0);
+    for (const file of endpoints) {
+      expect(code(read(file)), `${file} is reachable without a token`).toMatch(
+        /auth\s*=\s*"principal"/,
+      );
     }
   });
 
-  it("keeps swagger off the authenticated and webhook groups", () => {
-    expect(code(read("api/chancery/_group.xs"))).toMatch(/swagger\s*=\s*"private"/);
-    expect(code(read("api/auth/_group.xs"))).toMatch(/swagger\s*=\s*"private"/);
-    expect(code(read("api/webhook/_group.xs"))).toMatch(/swagger\s*=\s*"disabled"/);
-  });
-
-  it("applies centralised auth and audit middleware to the authenticated group", () => {
-    const group = code(read("api/chancery/_group.xs"));
-    expect(group).toMatch(/middleware\s*=\s*\[[^\]]*"require_auth"/);
-    expect(group).toMatch(/middleware\s*=\s*\[[^\]]*"audit_mutation"/);
-    expect(group).toMatch(/authentication\s*=\s*\{\s*table\s*=\s*"principal"/);
-  });
-
-  it("audits every group that accepts a mutation", () => {
-    for (const file of FILES.filter((name) => name.endsWith("_group.xs"))) {
+  it("leaves the public and webhook groups with no auth, and no writes in public", () => {
+    const endpoints = FILES.filter(
+      (name) => name.startsWith("api/public/") && !name.endsWith("api_group.xs"),
+    );
+    expect(endpoints).toHaveLength(3);
+    for (const file of endpoints) {
       const body = code(read(file));
-      const mutates = /"(POST|PATCH|PUT|DELETE)"/.test(body);
-      if (!mutates) continue;
-      expect(body, `${file} accepts writes without audit middleware`).toMatch(
-        /middleware\s*=\s*\[[^\]]*"audit_mutation"/,
+      expect(body, `${file} should be unauthenticated`).not.toMatch(/auth\s*=\s*"/);
+      expect(body, `${file} must be read-only`).toMatch(/verb=GET/);
+      expect(body, `${file} must not write`).not.toMatch(/db\.(add|edit|patch|del)\b/);
+    }
+  });
+
+  it("audits every mutating endpoint explicitly", () => {
+    // What `audit_mutation` would do if middleware were available on this plan.
+    const mutating = FILES.filter(
+      (file) => file.startsWith("api/") && /verb=(POST|PATCH|PUT|DELETE)/.test(read(file)),
+    );
+    expect(mutating.length).toBeGreaterThan(0);
+    // Two endpoints are exempt because their own write IS the durable record of
+    // the call, and a second row would be noise on the two hottest paths:
+    // `POST /ledger` appends a hash-chained entry, and the webhook inbox
+    // persists every delivery into `webhook_request` before it does anything.
+    const selfRecording = ["api/chancery/ledger_append.xs", "api/webhook/esign.xs"];
+    for (const file of mutating) {
+      if (selfRecording.includes(file)) continue;
+      expect(code(read(file)), `${file} mutates without an audit row`).toContain(
+        'function.run "audit_append"',
       );
     }
   });
@@ -240,14 +283,15 @@ describe("security posture", () => {
     expect(addressed.length).toBeGreaterThan(0);
     for (const file of addressed) {
       expect(code(read(file)), `${file} takes a writ uid without scoping it`).toContain(
-        "function.writ_owned",
+        'function.run "writ_owned"',
       );
     }
   });
 
   it("rate limits both credential endpoints", () => {
+    // `redis.ratelimit` is Essential-only, so this is the audit-table throttle.
     for (const file of ["api/auth/signup.xs", "api/auth/login.xs"]) {
-      expect(code(read(file)), file).toContain("security.rate_limit");
+      expect(code(read(file)), file).toContain('function.run "rate_guard"');
     }
   });
 
@@ -272,11 +316,11 @@ describe("the non-CRUD primitives", () => {
   it("has a table trigger on act insert that does not write the chain", () => {
     const trigger = code(read("trigger/act_recorded.xs"));
     expect(trigger).toMatch(/table\s*=\s*"act"/);
-    expect(trigger).toMatch(/actions\s*=\s*\[\s*"insert"/);
+    expect(trigger).toMatch(/actions\s*=\s*\{insert:\s*true/);
     // The chain has one writer; a trigger appending inside another statement's
     // transaction could leave a gap or an entry for an act that rolled back.
-    expect(trigger).not.toContain("function.ledger_append");
-    expect(trigger).toContain("function.job_enqueue");
+    expect(trigger).not.toContain('function.run "ledger_append"');
+    expect(trigger).toContain('function.run "job_enqueue"');
   });
 
   it("schedules every task in seconds, never as cron", () => {
@@ -307,9 +351,12 @@ describe("the non-CRUD primitives", () => {
     expect(FILES).toContain("task/reap_stale_claims.xs");
   });
 
-  it("verifies webhooks per source, over raw bytes, in constant time", () => {
+  it("verifies webhooks per source, over a canonical body, in constant time", () => {
     const verify = code(read("function/webhook_verify.xs"));
-    expect(verify).toContain("raw_body");
+    // XanoScript exposes no raw request body, so the signature base is the
+    // canonical form of the parsed payload. The header comment says so at
+    // length; this asserts the compromise has not silently been forgotten.
+    expect(verify).toContain("canon($input.body)");
     expect(verify).toContain("timingSafeEqual");
     expect(verify).toContain("createHmac");
     expect(verify).toContain("tolerance_seconds");
@@ -319,12 +366,12 @@ describe("the non-CRUD primitives", () => {
     // Cameron Booth's rule, and the opposite of the synchronous pattern on
     // Xano's own webhooks documentation page.
     const inbox = code(read("api/webhook/esign.xs"));
-    expect(inbox).toContain("function.job_enqueue");
+    expect(inbox).toContain('function.run "job_enqueue"');
     expect(inbox).toMatch(/response\s*=\s*\{\s*received:\s*true/);
     // Nothing expensive may run inside the provider's request.
     expect(inbox).not.toContain("api.request");
     // Every delivery is persisted, verified or not.
-    expect(inbox).toContain("db.add webhook_request");
+    expect(inbox).toContain('db.add "webhook_request"');
     expect(inbox).toContain('status: "replayed"');
   });
 
@@ -335,15 +382,98 @@ describe("the non-CRUD primitives", () => {
     expect(append).toContain("createHash('sha256')");
     // The sequence is inside the hash, so an entry cannot be moved.
     expect(append).toMatch(/sequence:\s*\$var\.sequence/);
-    // The tail is locked, or two appends fork the chain.
-    expect(append).toMatch(/lock\s*=\s*"update"/);
+    // The tail is locked, or two appends fork the chain. `lock` is a BOOLEAN —
+    // `lock = "update"` parses and then fails at runtime with
+    // `Invalid boolean input` naming `param: lock`.
+    expect(append).toMatch(/lock\s*=\s*true/);
+  });
+});
+
+/**
+ * Grammar rules that cost real push cycles to discover. Every one of these
+ * parses OR fails in a way that is hard to attribute, so they are asserted over
+ * the source rather than left to be rediscovered.
+ */
+describe("XanoScript grammar invariants", () => {
+  it("has no comment inside any array literal", () => {
+    // `// ...` inside `[ ... ]` fails the whole multidoc with
+    // "Invalid kind. Expecting static:object[], got assign:expr".
+    for (const [file, source] of SOURCES) {
+      let depth = 0;
+      source.split("\n").forEach((line, i) => {
+        if (line.trimStart().startsWith("//")) {
+          expect(depth, `${file}:${i + 1} comments inside an array literal`).toBe(0);
+          return;
+        }
+        let quote: string | null = null;
+        for (const ch of line) {
+          if (quote !== null) {
+            if (ch === quote) quote = null;
+            continue;
+          }
+          if (ch === '"' || ch === "'" || ch === "`") quote = ch;
+          else if (ch === "[") depth += 1;
+          else if (ch === "]") depth -= 1;
+        }
+      });
+    }
+  });
+
+  it("never uses the `default` filter, which does not exist at runtime", () => {
+    // It PARSES. It then fails with "Unable to locate func entry: default" the
+    // first time the endpoint is actually called — which is the trap: the push
+    // is green and the bug ships.
+    for (const [file, source] of SOURCES) {
+      expect(code(source), `${file} uses |default:`).not.toContain("|default:");
+    }
+  });
+
+  it("never uses add_secs_to_timestamp, which also does not exist at runtime", () => {
+    for (const [file, source] of SOURCES) {
+      expect(code(source), file).not.toContain("add_secs_to_timestamp");
+    }
+  });
+
+  it("keeps every block assignment on its own line", () => {
+    // Two assignments on one line is `Syntax error: unexpected newline`, pointed
+    // at the enclosing declaration rather than at the offending line.
+    const assignment = /\b[a-z_]+ = /g;
+    for (const [file, source] of SOURCES) {
+      for (const [i, line] of code(source).split("\n").entries()) {
+        // Object literals and `where` expressions legitimately contain `=`.
+        if (/[{[]/.test(line) || line.includes("==") || line.includes("=>")) continue;
+        const count = [...line.matchAll(assignment)].length;
+        expect(count, `${file}:${i + 1} has ${count} assignments: ${line.trim()}`).toBeLessThan(2);
+      }
+    }
+  });
+
+  it("gives every function and query an input block", () => {
+    // A `function` without one fails with "Missing block: input", even when it
+    // takes no arguments.
+    for (const [file, source] of SOURCES) {
+      const body = code(source);
+      if (!/^(function|query)\s/m.test(body)) continue;
+      expect(body, `${file} has no input block`).toMatch(/^\s*input \{/m);
+    }
+  });
+
+  it("keeps the lambda bodies foldable to a single line", () => {
+    // XanoScript has no multi-line string. `scripts/xano-push.ts` folds these at
+    // assembly time; the fold only works on a ``` code = ` ``` block that opens
+    // and closes on its own lines.
+    for (const [file, source] of SOURCES) {
+      const opens = [...source.matchAll(/^[ \t]*code = `$/gm)].length;
+      const total = [...source.matchAll(/^[ \t]*code = /gm)].length;
+      expect(opens, `${file} has a lambda the folder cannot handle`).toBe(total);
+    }
   });
 });
 
 describe("endpoint coverage of the WritStore port", () => {
   const queries = new Map<string, string>();
   for (const [file, source] of SOURCES) {
-    const match = /^query\s+(\S+)\s+verb=([A-Z]+)/m.exec(code(source));
+    const match = /^query\s+"([^"]+)"\s+verb=([A-Z]+)/m.exec(code(source));
     if (match !== null) queries.set(`${match[2]} ${match[1]}`, file);
   }
 
@@ -358,7 +488,7 @@ describe("endpoint coverage of the WritStore port", () => {
         "GET me",
         "POST writ",
         "GET writ/{writ_uid}",
-        "GET writ/by_domain",
+        "GET writ_by_domain",
         "PATCH writ/{writ_uid}",
         "GET writ/{writ_uid}/act",
         "POST writ/{writ_uid}/act",

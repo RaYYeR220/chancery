@@ -20,9 +20,10 @@ table receipt {
     enum outcome { values = ["allow", "deny"] }
   }
 
+  // The idempotency of `putEvidence` rests entirely on the unique index over
+  // `digest`. (Comments cannot appear inside an array literal.)
   index = [
     {type: "primary", field: [{name: "id"}]}
-    // The idempotency of `putEvidence` rests entirely on this index.
     {type: "btree|unique", field: [{name: "digest", op: "asc"}]}
     {type: "btree", field: [{name: "writ_id", op: "asc"}, {name: "created_at", op: "desc"}]}
   ]
