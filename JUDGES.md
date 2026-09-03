@@ -80,7 +80,7 @@ The **negative result** in [`CLAIMS.md`](./CLAIMS.md). We claimed the signing bo
 - **Live demo** — https://chancery.live
 - **Public verifier** — https://chancery.live/verify
 - **Public ledger** — https://x8ki-letl-twmt.n7.xano.io/api:chancery-verify/ledger/spine
-- Video — *(see the submission page)*
+- **Video** — https://youtu.be/t14eSJ_cQ_U (2:53)
 
 ## And a live writ you can check without us
 

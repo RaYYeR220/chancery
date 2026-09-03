@@ -4,7 +4,7 @@
 
 An AI can draft it. Only a human can commit to it.
 
-**[chancery.live](https://chancery.live)** · [the public verifier](https://chancery.live/verify) · [the ledger](https://x8ki-letl-twmt.n7.xano.io/api:chancery-verify/ledger/spine)
+**[chancery.live](https://chancery.live)** · [the public verifier](https://chancery.live/verify) · [the ledger](https://x8ki-letl-twmt.n7.xano.io/api:chancery-verify/ledger/spine) · [the demo, 2:53](https://youtu.be/t14eSJ_cQ_U)
 
 Check it without taking our word for anything:
 
