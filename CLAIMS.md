@@ -6,6 +6,7 @@ Every public statement we make about Chancery, tagged by what actually backs it.
 | --- | --- |
 | **REPRODUCIBLE** | You can re-run it yourself, from this repo, with no credentials and no account. |
 | **VERIFIED-LIVE** | We ran it against the real third-party service and kept the output. |
+| **VERIFIED-LIVE** | We called the real third-party service and kept what came back. `pnpm smoke` re-runs every one of these. |
 | **MODELED** | Implemented, typed and tested against the vendor's documented contract — but not yet exercised against a live credential. |
 | **NOT-CLAIMED** | Something a reader might reasonably assume, that we are explicitly *not* asserting. |
 
@@ -30,14 +31,15 @@ Every public statement we make about Chancery, tagged by what actually backs it.
 | The verifier resolves authority from public DNS and holds no credentials. | REPRODUCIBLE | `pnpm verify example.com`. `src/cli/verify.ts` imports nothing from the service layer. |
 | DNSSEC validation is required by default; an unvalidated answer is reported as unverified rather than trusted. | REPRODUCIBLE | Benchmark scenario R-16. The opt-out is explicit and every decision made under it says so in its own reasons. |
 | Revocation is published as a tombstone that outranks any active record, whatever its expiry. | REPRODUCIBLE | Benchmark scenario T-01. |
-| A writ is published in a live DNS zone and resolves from public resolvers. | *pending* | Requires the production registrar credential. Until then this is MODELED, and `MOCKS.md` says so. |
+| A domain is registered and a WRIT1 record published to it through the registrar's real API. | **VERIFIED-LIVE** | `pnpm anchor`. Search, registration and the DNS write all run against name.com; the record is then read back. In the sandbox that read-back goes through the registrar, which is **not** the verification path, and the script says so. |
+| A writ resolves from public resolvers, so a stranger can verify it. | *pending* | Needs a production registration. The sandbox zone is real but never resolves publicly. See `MOCKS.md`. |
 
 ## The signature boundary
 
 | Claim | Tier | How to check |
 | --- | --- | --- |
-| The agent-facing surface cannot reach the signing service, because it holds no signing credential. | MODELED | Enforced structurally: the agent-facing object has no field that could carry one. |
-| An agent attempting to send for signature receives a real HTTP 401 from the signing service. | *pending* | Needs live Foxit eSign credentials to demonstrate. |
+| The agent-facing surface cannot reach the signing service, because it holds no signing credential. | MODELED | Enforced in four independent places: the agent surface holds only functions so a credential field will not compile; PDF Services credentials are not assignable where eSign ones are required; every assembled path is checked before it reaches the wire; and the key itself is not eSign-entitled. |
+| **An agent attempting to send for signature receives a real refusal from Foxit, not a refusal from us.** | **VERIFIED-LIVE** | `pnpm smoke`. Against `POST /esign/api/v1/folders/createfolder`: no credentials returns `400 Missing credentials: provide both 'client_id' and 'client_secret' headers`, wrong credentials returns `401 Invalid credentials`, and the server's own credentials get past authentication. The refusal proof has no local branch that refuses — it posts and reports what came back. |
 | The signed document's cryptographic signature is verified before any act is allowed. | MODELED | `signatureValid !== true` denies, including when the check could not be performed. |
 
 ## Grounding
@@ -48,7 +50,8 @@ Every public statement we make about Chancery, tagged by what actually backs it.
 | A term that did not ground in the page it came from makes its clause unenforceable. | REPRODUCIBLE | Benchmark R-15 and T-02. |
 | The gate keys on the match kind, not on a confidence number, and there is no default threshold. | REPRODUCIBLE | `src/lib/adapters/nutrient/grounding.ts`; a `fuzzy_match` at 0.99 confidence does not ground. |
 | Confidence is never presented as a probability or a percentage. | REPRODUCIBLE | A test asserts no rendered finding contains `%`. |
-| Extraction against the live Nutrient API produces these citations for our writ. | *pending* | Needs a live API key. |
+| The Nutrient account and its free execution planner respond. | **VERIFIED-LIVE** | `pnpm smoke` reports the credit balance and runs `analyze_build`, which returns the execution plan a Build would follow and costs nothing. |
+| Extraction against the live API produces these citations for our writ. | *pending* | The free tier is 50 credits and one page of schema-bound extraction costs 15, so this is run deliberately rather than casually. |
 
 ## Diligence
 
@@ -56,7 +59,8 @@ Every public statement we make about Chancery, tagged by what actually backs it.
 | --- | --- | --- |
 | A check that could not complete returns `unknown`, and `unknown` denies. | REPRODUCIBLE | Benchmark T-03 and T-04. `unknown` is minted in exactly one function, always with zero citations. |
 | Eleven search engines are wired, each contributing to a specific check. | MODELED | `DILIGENCE_ENGINES` in `src/lib/adapters/serpapi/diligence.ts`. |
-| Findings carry live citations a human can open. | *pending* | The shapes are captured-shape fixtures built to the documented structure, not captured from a live key. |
+| Google Patents' litigation filter returns real results. | **VERIFIED-LIVE** | `pnpm smoke`. It also corrected the code: the parameter takes the literal strings `YES`/`NO` and rejects a boolean outright, which the documentation did not settle. |
+| Findings carry live citations a human can open. | MODELED | The per-engine fixtures are captured-*shape*, built to the documented structure rather than captured from a live key. A field name we got wrong surfaces as `unknown` — which denies — not as a false pass. |
 
 ## The agent
 
