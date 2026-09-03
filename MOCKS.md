@@ -43,7 +43,7 @@ The API is real. Two limits are inherent to the tier rather than to our integrat
 - **Foxit's own key scoping does not separate PDF Services from eSign on a developer account.** We assumed it did and were wrong; see the negative result in `CLAIMS.md`. It is the reason our boundary is about who holds a credential rather than about what a credential is scoped to.
 
 ### Generating the writ — Doctavian
-Live, and the generation flow completes. Two honest notes. Five of sixteen output checks fail because `<mdoc:text>` elements render no text, so several conditional clauses are decided correctly and then not printed — the branching is right, its output is missing, and we say so rather than showing a document that looks complete. And the writ published at `chancery.live/w/1.pdf` was rendered through the Nutrient fallback, not by Doctavian: it was produced while Doctavian's engine was returning 500s, and we did not re-issue it afterwards because the hash in DNS is bound to those exact bytes.
+Live, and the generation flow completes, with all sixteen output checks passing. One honest note remains: the writ published at `chancery.live/w/1.pdf` was rendered through the Nutrient fallback, not by Doctavian: it was produced while Doctavian's engine was returning 500s, and we did not re-issue it afterwards because the hash in DNS is bound to those exact bytes.
 
 ### Reading the signed writ back — Nutrient DWS
 The API is real. Two things to be honest about:

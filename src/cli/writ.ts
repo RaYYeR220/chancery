@@ -46,7 +46,7 @@ import { buildWritTemplateDocx } from "../lib/adapters/doctavian/writ-template";
  * suggest.
  */
 const TIMEZONE = "(GMT+00:00) Greenwich Mean Time (Europe/Dublin)";
-const LOCALE = "en_IE_EURO";
+const LOCALE = "en_IE";
 
 const SAMPLE_OPTIONS = {
   escalationPercent: 25,

@@ -93,6 +93,12 @@ export interface WritRow {
   JurisdictionName: string;
   /** "true" / "false" — decides whether the eIDAS clause renders at all. */
   JurisdictionIsEea: string;
+  /**
+   * "true" / "false". A flag rather than a template-side comparison because
+   * `hidden=` rejects `!=`, `!(...)` and ternaries, so "not GB" cannot be
+   * written in the template at all.
+   */
+  JurisdictionIsUk: string;
   Currency: string;
   CurrencySymbol: string;
   EffectiveFrom: string;
@@ -195,6 +201,7 @@ export function buildWritData(
         Jurisdiction: writ.jurisdiction,
         JurisdictionName: JURISDICTION_NAMES[writ.jurisdiction] ?? writ.jurisdiction,
         JurisdictionIsEea: String(EEA_JURISDICTIONS.has(writ.jurisdiction)),
+        JurisdictionIsUk: String(writ.jurisdiction === "GB"),
         Currency: currency,
         CurrencySymbol: CURRENCY_SYMBOLS[currency] ?? currency,
         EffectiveFrom: writ.effectiveFrom.slice(0, 10),

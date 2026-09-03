@@ -145,6 +145,7 @@ pnpm verify --bundle path/to/decision.json
 - **A free-tier signature is a test certificate.** It is cryptographically real and it is not a production trust anchor. We do not present it as one.
 - **Diligence is evidence, not adjudication.** A trademark search is a strong signal and not a legal opinion. Findings carry their sources so a human can judge them.
 - **The published zone is not DNSSEC-signed.** `chancery.live` resolves and its hash matches, but the answer carries no AD flag, so a strict verifier reports the authority as unverified and denies. Running against it needs `CHANCERY_ALLOW_UNAUTHENTICATED_DNS=true`, and every decision made under that flag records that it was.
+- **The generated writ prints its expiry as a raw ISO instant.** Doctavian's `addDays` returns a full timestamp and every date-formatting function we tried returns the empty string, so clause 2.1 reads `2026-12-02T00:00:00.000Z`. The date is computed correctly; only its presentation is raw.
 - **`domain.register` is the only act with an executor wired.** The others are modelled end to end and gated identically, but only one of them spends money today.
 
 ## Licence

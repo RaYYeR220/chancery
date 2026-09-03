@@ -13,8 +13,8 @@
         "message": "OK"
       },
       "origin": "",
-      "dateTime": "2026-09-03T10:00:21.8800403Z",
-      "operationId": "196749f52cc07fcf4f141a84aca0c402"
+      "dateTime": "2026-09-03T16:01:04.955059Z",
+      "operationId": "c9cf07ecd8456457f14f14a5a0de760a"
     }
   },
   {
@@ -24,18 +24,18 @@
     "body": {
       "result": {
         "data": {
-          "dataSourceGuid": "f6665267-3d6e-4c07-99d0-9a6bf007aa69",
+          "dataSourceGuid": "01e5a432-69a7-4a4a-b67c-840085c072d2",
           "subscriptionGuid": "<redacted>",
           "ownerGuid": "<redacted>",
           "lastModifiedUserGuid": "<redacted>",
-          "name": "chancery-writ-2026-09-03T10-00-21-294Z",
+          "name": "chancery-writ-2026-09-03T16-01-04-575Z",
           "description": "Chancery writ of delegated authority",
           "urn": null,
           "query": null,
           "variables": null,
           "loadMethod": "Storage",
-          "createdDate": "2026-09-03T10:00:22.1566667",
-          "lastModifiedDate": "2026-09-03T10:00:22.1566667",
+          "createdDate": "2026-09-03T16:01:05.2",
+          "lastModifiedDate": "2026-09-03T16:01:05.2",
           "isDeleted": false,
           "folderId": "00000000-0000-0000-0000-000000000000",
           "ownerName": null,
@@ -45,8 +45,8 @@
         "message": "OK"
       },
       "origin": "",
-      "dateTime": "2026-09-03T10:00:22.1650226Z",
-      "operationId": "348664e7a5fb1532bbb4d1374a166b14"
+      "dateTime": "2026-09-03T16:01:05.2086004Z",
+      "operationId": "08ff6b1e951147700c3394096db0a17a"
     }
   },
   {
@@ -57,15 +57,15 @@
       "result": {
         "data": {
           "documentSolution": {
-            "documentSolutionGuid": "7e2957dc-e9e6-4d42-8d9b-4189675ac829",
+            "documentSolutionGuid": "8df9cb9c-3541-4d98-b233-2a70054837f9",
             "subscriptionGuid": "<redacted>",
             "ownerGuid": "<redacted>",
             "lastModifiedUserGuid": "<redacted>",
-            "name": "chancery-writ-2026-09-03T10-00-21-294Z",
+            "name": "chancery-writ-2026-09-03T16-01-04-575Z",
             "description": "Chancery writ of delegated authority",
             "folderId": "00000000-0000-0000-0000-000000000000",
-            "createdDate": "2026-09-03T10:00:22.2433333",
-            "lastModifiedDate": "2026-09-03T10:00:22.2433333",
+            "createdDate": "2026-09-03T16:01:05.27",
+            "lastModifiedDate": "2026-09-03T16:01:05.27",
             "lastRequestDate": null,
             "isDeleted": false
           }
@@ -74,8 +74,8 @@
         "message": "OK"
       },
       "origin": "",
-      "dateTime": "2026-09-03T10:00:22.2522868Z",
-      "operationId": "ec4e8597001ad9b739d2bbcaaccbe882"
+      "dateTime": "2026-09-03T16:01:05.2785875Z",
+      "operationId": "7ff9f109d8acce6ba0f66c291445e5ac"
     }
   },
   {
@@ -87,7 +87,7 @@
         "data": {
           "files": [
             {
-              "id": "1620ecdd-71d4-4c5e-b48b-864e31a8dcf2",
+              "id": "1746f045-1fef-49d4-a01e-1d7ba5c7e333",
               "fileName": "writ-template.docx"
             }
           ]
@@ -96,8 +96,8 @@
         "message": "Created"
       },
       "origin": "POST https://demo.api.doctavian.com/v1/documents/template/upload",
-      "dateTime": "2026-09-03T10:00:22.5754644Z",
-      "operationId": "b671eeebee7142631e63480f1740fd27"
+      "dateTime": "2026-09-03T16:01:05.4226292Z",
+      "operationId": "bae41f6d2f6622e68c26957edcce6f8f"
     }
   },
   {
@@ -109,7 +109,7 @@
         "data": {
           "files": [
             {
-              "id": "175216f2-4268-4369-b015-d71ebaa501fc",
+              "id": "01e5b615-9ac6-4c4d-aaa6-5662922d7d98",
               "fileName": "writ-data.json"
             }
           ]
@@ -118,38 +118,122 @@
         "message": "Created"
       },
       "origin": "POST https://demo.api.doctavian.com/v1/documents/data/upload",
-      "dateTime": "2026-09-03T10:00:22.7671777Z",
-      "operationId": "52b7365b540647511a9589d807884839"
+      "dateTime": "2026-09-03T16:01:05.5589993Z",
+      "operationId": "88c17b575885e71a7d3a9a2570b67d35"
     }
   },
   {
     "method": "POST",
     "path": "/v1/documents/document/generate",
-    "status": 500,
+    "status": 200,
     "body": {
-      "error": {
-        "statusCode": 500,
-        "message": "Internal Server Error",
-        "innerErrors": [
-          {
-            "code": "TEMPLATE_READ_FAILED",
-            "message": "Failed to read the template.",
-            "userMessage": "There was an issue reading the template. Please check the template format",
-            "eventId": "4e20040b-f5d0-435a-95f0-e1c090d14475"
-          },
-          {
-            "code": "GENERATE_FUNCTION_FAILED",
-            "message": "Failed to generate the document.",
-            "userMessage": "There was an issue generating the document. Please check the input data and try again.",
-            "eventId": "689608b5-0778-4acb-b7a2-63bba254ab50"
+      "result": {
+        "statusCode": 201,
+        "message": "Created",
+        "data": {
+          "document": {
+            "deliveryMethod": "Storage",
+            "name": "chancery-writ-2026-09-03T16-01-04-575Z-pdf",
+            "fileFormat": "pdf",
+            "urn": "db8778eb-3301-4e0f-8351-62de26b96118"
           }
-        ],
-        "externalErrors": []
+        }
       },
+      "consumption": [
+        {
+          "dimension": "documents-generated",
+          "value": 1
+        }
+      ],
       "origin": "POST https://demo.api.doctavian.com/v1/documents/document/generate",
-      "dateTime": "2026-09-03T10:00:23.0953693Z",
+      "dateTime": "2026-09-03T16:01:06.2043822Z",
       "userId": "<redacted>",
-      "operationId": "e6cda325c93d4921ea0e9f41838c2d58"
+      "operationId": "a9e5677fbb73145a145bff23d7633da7"
     }
+  },
+  {
+    "method": "GET",
+    "path": "/v1/documents/document/db8778eb-3301-4e0f-8351-62de26b96118/download",
+    "status": 200,
+    "body": "<application/pdf>"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/documents/template/upload",
+    "status": 201,
+    "body": {
+      "result": {
+        "data": {
+          "files": [
+            {
+              "id": "b2a1c557-2771-4596-90fd-aeb9735955df",
+              "fileName": "writ-template.docx"
+            }
+          ]
+        },
+        "statusCode": 201,
+        "message": "Created"
+      },
+      "origin": "POST https://demo.api.doctavian.com/v1/documents/template/upload",
+      "dateTime": "2026-09-03T16:01:06.5727725Z",
+      "operationId": "6baebedf666776be81d5289c2fdab04b"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1/documents/data/upload",
+    "status": 201,
+    "body": {
+      "result": {
+        "data": {
+          "files": [
+            {
+              "id": "4253d4cc-5b8d-4f7b-a611-529b617a0375",
+              "fileName": "writ-data.json"
+            }
+          ]
+        },
+        "statusCode": 201,
+        "message": "Created"
+      },
+      "origin": "POST https://demo.api.doctavian.com/v1/documents/data/upload",
+      "dateTime": "2026-09-03T16:01:06.6732788Z",
+      "operationId": "3c058dccd0d121239c34fc28f9f2340d"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1/documents/document/generate",
+    "status": 200,
+    "body": {
+      "result": {
+        "statusCode": 201,
+        "message": "Created",
+        "data": {
+          "document": {
+            "deliveryMethod": "Storage",
+            "name": "chancery-writ-2026-09-03T16-01-04-575Z-docx",
+            "fileFormat": "docx",
+            "urn": "241756ea-4323-4c3d-9cc3-8622bda81a39"
+          }
+        }
+      },
+      "consumption": [
+        {
+          "dimension": "documents-generated",
+          "value": 1
+        }
+      ],
+      "origin": "POST https://demo.api.doctavian.com/v1/documents/document/generate",
+      "dateTime": "2026-09-03T16:01:07.1670404Z",
+      "userId": "<redacted>",
+      "operationId": "75244164f5cc3a19e4d5b6c739847ce5"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1/documents/document/241756ea-4323-4c3d-9cc3-8622bda81a39/download",
+    "status": 200,
+    "body": "<application/vnd.openxmlformats-officedocument.wordprocessingml.document>"
   }
 ]

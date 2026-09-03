@@ -132,11 +132,49 @@ describe("the response envelope the live API actually sends", () => {
     expect(templates[0].name).toBe("writ.docx");
   });
 
-  it("surfaces the innerErrors array the live API reports failures in", async () => {
-    const failure = entry("POST", "/v1/documents/document/generate");
+  it("reads the urn and the billed consumption off the live generate body", async () => {
+    const generated = entry("POST", "/v1/documents/document/generate");
+    // HTTP 200, even though the envelope's own `result.statusCode` says "201"
+    // and the spec documents the response under 201. Only the envelope agrees
+    // with the docs.
+    expect(generated.status).toBe(200);
+    expect((generated.body as { result: { statusCode: number } }).result.statusCode).toBe(201);
     const { doctavian } = client({
       "POST /v1/documents/document/generate": () =>
-        errorResponse(failure.body, failure.status, "Internal Server Error"),
+        jsonResponse(generated.body, generated.status),
+    });
+
+    const result = await doctavian.generateDocument({
+      template: { name: "t.docx", urn: "t", fileFormat: "docx", loadMethod: "Storage" },
+      data: { urn: "d", loadMethod: "Storage" },
+      document: {
+        name: "w",
+        fileFormat: "pdf",
+        deliveryMethod: "Storage",
+        path: "root",
+        locale: "en_IE",
+        timezone: "(GMT+00:00) Greenwich Mean Time (Europe/Dublin)",
+      },
+    });
+
+    expect(result.urn).toMatch(/^[0-9a-f-]{36}$/);
+    // `consumption` is a sibling of `result`, not a child of `result.data`.
+    expect(result.consumption).toEqual([{ dimension: "documents-generated", value: 1 }]);
+  });
+
+  it("still surfaces an innerErrors failure body verbatim", async () => {
+    const { doctavian } = client({
+      "POST /v1/documents/document/generate": () =>
+        errorResponse(
+          {
+            error: {
+              statusCode: 500,
+              innerErrors: [{ code: "TEMPLATE_READ_FAILED", message: "Failed to read the template." }],
+            },
+          },
+          500,
+          "Internal Server Error",
+        ),
     });
 
     const error = (await doctavian

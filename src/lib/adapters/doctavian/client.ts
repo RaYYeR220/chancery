@@ -240,7 +240,7 @@ export class DoctavianClient {
       bytes:
         data instanceof Uint8Array
           ? data
-          : new TextEncoder().encode(JSON.stringify(data)),
+          : new TextEncoder().encode(JSON.stringify(wrapDataRoot(data))),
     };
     const body = await this.postMultipart(
       "documents",
@@ -651,6 +651,23 @@ function readConsumption(raw: unknown): ConsumptionEntry[] {
     const value = readNumber(entry, "value");
     return dimension === null || value === null ? [] : [{ dimension, value }];
   });
+}
+
+/**
+ * The uploaded JSON must sit under a root `data` object.
+ *
+ * Without it the *generate* call — two steps later — fails with
+ * `TEMPLATE_READ_FAILED`, which names the wrong file entirely and sends you
+ * hunting through a template that was never the problem. The upload itself
+ * answers `201`, so nothing at the point of the mistake reports it. Confirmed
+ * by Doctavian support; documented nowhere.
+ *
+ * A payload that already carries the wrapper is passed through, so a caller
+ * holding a file in the on-the-wire shape is not double-wrapped.
+ */
+export function wrapDataRoot(data: unknown): unknown {
+  if (isRecord(data) && Object.keys(data).length === 1 && "data" in data) return data;
+  return { data };
 }
 
 /**

@@ -78,12 +78,16 @@ describe("looping", () => {
 
 describe("branching", () => {
   it("gates the eIDAS clause and its fallback on jurisdiction, so exactly one prints", () => {
+    // The `$` is required: without it the attribute is read as a merge field,
+    // a non-empty string is truthy, and the clause hides unconditionally.
     expect(WRIT_CONDITIONS.notEea).toBe("{!$Writ[0].JurisdictionIsEea == 'false'}");
     expect(WRIT_CONDITIONS.isEea).toBe("{!$Writ[0].JurisdictionIsEea == 'true'}");
     expect(template).toContain('name="eidasClause"');
     expect(template).toContain('name="nonEeaClause"');
     expect(template).toContain('name="ukClause"');
-    expect(WRIT_CONDITIONS.notUk).toContain("Writ[0].Jurisdiction in ['GB']");
+    // `!=`, `!(...)` and ternaries are all rejected inside `hidden=`, so "not
+    // GB" has to arrive as a pre-computed flag.
+    expect(WRIT_CONDITIONS.notUk).toBe("{!$Writ[0].JurisdictionIsUk == 'false'}");
   });
 
   it("hides the escalation clause below the threshold instead of printing noise", () => {
@@ -115,6 +119,8 @@ describe("branching", () => {
     const hidden = [...template.matchAll(/hidden="([^"]+)"/g)];
     expect(hidden.length).toBeGreaterThanOrEqual(9);
     for (const [, value] of hidden) {
+      // Dropping the `$` is the trap: the clause then hides unconditionally,
+      // and its absence from the signed document is reported nowhere.
       expect(value.startsWith("{!$")).toBe(true);
     }
   });
@@ -128,15 +134,20 @@ describe("calculating", () => {
   });
 
   it("computes the expiry from the effective date plus the term rather than carrying it", () => {
-    expect(WRIT_EXPRESSIONS.expiresAt).toContain("dateAdd(Writ[0].EffectiveFrom");
+    // `addDays`, not `dateAdd`: an unknown function renders empty rather than
+    // erroring, so the wrong name is invisible until you read the output.
+    expect(WRIT_EXPRESSIONS.expiresAt).toContain("addDays(Writ[0].EffectiveFrom");
     expect(WRIT_EXPRESSIONS.expiresAt).toContain("toDecimal(Writ[0].TermDays)");
     expect(template).toContain(`{!$${WRIT_EXPRESSIONS.expiresAt}}`);
   });
 
   it("computes the escalation threshold as a percentage of the aggregate ceiling", () => {
+    // `round(x, 0)` evaluates to the empty string on this engine, so the
+    // scaling is left entirely to setScale.
     expect(WRIT_EXPRESSIONS.escalationThresholdMinor).toBe(
-      "round(sum(Writ[0].Grants, 'CapMinor') * toDecimal(Writ[0].EscalationPercent) / 100, 0)",
+      "sum(Writ[0].Grants, 'CapMinor') * toDecimal(Writ[0].EscalationPercent) / 100",
     );
+    expect(WRIT_EXPRESSIONS.escalationThresholdAmount).not.toContain("round(");
     expect(WRIT_EXPRESSIONS.escalationPercentLabel).toContain("toPercent(");
   });
 

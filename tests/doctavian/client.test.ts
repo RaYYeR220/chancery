@@ -169,7 +169,19 @@ describe("generation flow", () => {
     expect(fake.calls[0].headers["content-type"]).toBeUndefined();
   });
 
-  it("uploads the data payload as a JSON file", async () => {
+  it("does not double-wrap a payload that already carries the data root", async () => {
+    const { fake, doctavian } = client({
+      "POST /v1/documents/data/upload": () =>
+        jsonResponse({ result: { data: { files: [{ id: "dat-1" }] } } }, 201),
+    });
+
+    await doctavian.uploadData({ data: { Writ: [{ Id: "w1" }] } });
+
+    const file = fake.calls[0].form?.get("file") as File;
+    expect(JSON.parse(await file.text())).toEqual({ data: { Writ: [{ Id: "w1" }] } });
+  });
+
+  it("uploads the data payload as a JSON file wrapped in a root data object", async () => {
     const { fake, doctavian } = client({
       "POST /v1/documents/data/upload": () => jsonResponse({ result: { data: { files: [{ id: "dat-1", fileName: "data.json" }] } } }, 201),
     });
@@ -179,7 +191,9 @@ describe("generation flow", () => {
     const file = fake.calls[0].form?.get("file") as File;
     expect(file.name).toBe("data.json");
     expect(file.type).toBe("application/json");
-    expect(JSON.parse(await file.text())).toEqual({ Writ: [{ Id: "w1" }] });
+    // Wrapped in a root `data` object. Without it the *generate* call two steps
+    // later fails with TEMPLATE_READ_FAILED, naming a file that is fine.
+    expect(JSON.parse(await file.text())).toEqual({ data: { Writ: [{ Id: "w1" }] } });
   });
 
   it("uses the sync generate endpoint and returns the urn and consumption", async () => {

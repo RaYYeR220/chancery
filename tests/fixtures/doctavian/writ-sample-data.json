@@ -12,6 +12,7 @@
       "Jurisdiction": "IE",
       "JurisdictionName": "Ireland",
       "JurisdictionIsEea": "true",
+      "JurisdictionIsUk": "false",
       "Currency": "EUR",
       "CurrencySymbol": "€",
       "EffectiveFrom": "2026-09-03",

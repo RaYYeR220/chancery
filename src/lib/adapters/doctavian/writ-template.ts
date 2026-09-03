@@ -72,14 +72,27 @@ export function loopRef(variable: string, path: string): string {
 
 export interface MdocTextOptions {
   name: string;
-  value: string;
+  /** Literal text, `{!field}` merge fields and `{!$expr}` expressions. */
+  content: string;
   /** A Jexl expression tag; when it evaluates true the element is not rendered. */
   hidden?: string;
 }
 
+/**
+ * A conditional block of text.
+ *
+ * `mdoc:text` is a *container*, like `mdoc:repeater`: the text goes between the
+ * tags and the closing tag repeats the name. The self-closing `value="…"` form
+ * that the docs' one worked example suggests is accepted, renders nothing at
+ * all, and reports no error — a whole clause simply vanishes from the document.
+ * That silent failure also produced a misleading second symptom: with the
+ * `value=` form a `hidden` condition that evaluated true failed the entire
+ * generation with ELEMENT_PROCESSING_FAILED, which looks like a problem with
+ * the condition rather than with the element shape. Both verified live.
+ */
 export function mdocText(options: MdocTextOptions): string {
   const hidden = options.hidden ? ` hidden="${options.hidden}"` : "";
-  return `<mdoc:text name="${options.name}" value="${options.value}"${hidden} />`;
+  return `<mdoc:text name="${options.name}"${hidden}>${options.content}</mdoc:text name="${options.name}">`;
 }
 
 export function mdocRepeaterOpen(options: {
@@ -103,11 +116,17 @@ const SYMBOL = "Writ[0].CurrencySymbol";
 /**
  * Every calculated figure in the document, in one place.
  *
- * `sum`, `count`, `max`, `toDecimal`, `round`, `setScale`, `toPercent`, `join`
- * and `concat` are documented Doctavian functions. `dateAdd` and `formatDate`
- * are named from the documented "full date function set" but their exact
- * spelling is unverified against a live tenant — they are isolated here so one
- * edit fixes the whole document if the names differ.
+ * `sum`, `count`, `max`, `toDecimal`, `setScale`, `toPercent` and `concat` are
+ * all confirmed working against the live API, including the two-argument
+ * `sum(collection, 'Field')` form. `round(x, 0)` is NOT — it evaluates to the
+ * empty string, so `setScale` does the rounding here instead.
+ *
+ * The date function is `addDays(date, n)`, not `dateAdd(date, n, unit)`. That
+ * distinction cost a render: an unknown function does not error, it evaluates
+ * to the empty string, so `dateAdd(...)` produced a clause reading "expires at
+ * 23:59 UTC on ," in an otherwise perfect document. There is no `formatDate`
+ * either — `addDays` returns a full ISO-8601 instant and the locale in the
+ * generate request is what formats dates.
  */
 export const WRIT_EXPRESSIONS = {
   /** Aggregate ceiling: the per-class caps summed, in minor units. */
@@ -125,36 +144,70 @@ export const WRIT_EXPRESSIONS = {
    * rather than carried in the data so it can never disagree with the caps
    * printed two clauses above it.
    */
-  escalationThresholdMinor: `round(sum(${GRANTS}, 'CapMinor') * toDecimal(Writ[0].EscalationPercent) / 100, 0)`,
-  escalationThresholdFormatted: `concat(${SYMBOL}, setScale(round(sum(${GRANTS}, 'CapMinor') * toDecimal(Writ[0].EscalationPercent) / 100, 0) / 100, 2))`,
+  escalationThresholdMinor: `sum(${GRANTS}, 'CapMinor') * toDecimal(Writ[0].EscalationPercent) / 100`,
+  escalationThresholdFormatted: `concat(${SYMBOL}, setScale(sum(${GRANTS}, 'CapMinor') * toDecimal(Writ[0].EscalationPercent) / 10000, 2))`,
   escalationPercentLabel: `toPercent(toDecimal(Writ[0].EscalationPercent) / 100)`,
   /** Expiry derived from the effective date plus the term, never carried raw. */
-  expiresAt: `formatDate(dateAdd(Writ[0].EffectiveFrom, toDecimal(Writ[0].TermDays), 'day'), 'yyyy-MM-dd')`,
+  expiresAt: `addDays(Writ[0].EffectiveFrom, toDecimal(Writ[0].TermDays))`,
   dailyCapFormatted: `concat(${SYMBOL}, setScale(toDecimal(Writ[0].DailyCapMinor) / 100, 2))`,
+  /**
+   * Bare amounts, for clause text that supplies its own currency symbol as a
+   * merge field. Keeping the symbol out of the expression keeps the expression
+   * to one job — the arithmetic — and the arithmetic is the part that breaks.
+   */
+  dailyCapAmount: `setScale(toDecimal(Writ[0].DailyCapMinor) / 100, 2)`,
+  escalationThresholdAmount: `setScale(sum(${GRANTS}, 'CapMinor') * toDecimal(Writ[0].EscalationPercent) / 10000, 2)`,
+  grantCapAmount: `setScale(toDecimal(#grant#.CapMinor) / 100, 2)`,
+  /** Each class's ceiling as a share of the aggregate, computed per iteration. */
+  grantShareOfTotal: `toPercent(toDecimal(#grant#.CapMinor) / sum(${GRANTS}, 'CapMinor'))`,
+  grantEscalationAmount: `setScale(toDecimal(#grant#.EscalationMinor) / 100, 2)`,
 } as const;
 
-/** Conditions for `hidden=`, i.e. the branching. */
+/**
+ * A `hidden=` condition. The `$` is required.
+ *
+ * Without it the attribute is read as a merge field rather than as an
+ * expression, and a non-empty string is truthy, so `hidden="{!X == 'y'}"`
+ * hides the block unconditionally — including when the condition is false.
+ * That fails silently in the worst direction: the clause is simply missing
+ * from the signed document, with no error anywhere. Verified live at root
+ * level and inside a repeater.
+ */
+export function condition(body: string): string {
+  return `{!$${body}}`;
+}
+
+/**
+ * Conditions for `hidden=`, i.e. the branching.
+ *
+ * `!=`, the `!(...)` negation and the ternary were all rejected while the
+ * elements were still in their broken self-closing form, so every negative
+ * condition here is expressed as an equality against a flag computed in the
+ * data. That is worth keeping regardless: a flag is one thing to read in the
+ * uploaded JSON when a clause renders wrongly, rather than a negation to
+ * re-evaluate by eye against the template.
+ */
 export const WRIT_CONDITIONS = {
   /** eIDAS binds by territory, so the clause hides outside the EEA. */
-  notEea: expr("Writ[0].JurisdictionIsEea == 'false'"),
+  notEea: condition("Writ[0].JurisdictionIsEea == 'false'"),
   /** …and the non-EEA fallback hides inside it. Exactly one of the two prints. */
-  isEea: expr("Writ[0].JurisdictionIsEea == 'true'"),
-  /** A UK-only clause: the 2002 Order, not eIDAS. */
-  notUk: expr("!(Writ[0].Jurisdiction in ['GB'])"),
+  isEea: condition("Writ[0].JurisdictionIsEea == 'true'"),
+  /** A UK-only clause. `!(... in [...])` is rejected, so the flag is computed in the data. */
+  notUk: condition("Writ[0].JurisdictionIsUk == 'false'"),
   /** No daily ceiling was set, so the clause must not exist at all. */
-  noDailyCap: expr("Writ[0].DailyCapMinor == ''"),
+  noDailyCap: condition("Writ[0].DailyCapMinor == ''"),
   /** Escalation below the floor protects nothing and only adds friction. */
-  belowEscalationFloor: expr(
+  belowEscalationFloor: condition(
     `sum(${GRANTS}, 'CapMinor') <= toDecimal(Writ[0].EscalationFloorMinor)`,
   ),
   /** Unverified principal: the recital of verification must not be printed. */
-  principalUnverified: expr("Writ[0].PrincipalVerified == 'false'"),
-  grantUncapped: expr("#grant#.HasCap == 'false'"),
-  grantNoCount: expr("#grant#.CountMax == ''"),
-  grantNoAllowlist: expr("#grant#.AllowlistValues == ''"),
-  grantNoPattern: expr("#grant#.Pattern == ''"),
-  grantNoDiligence: expr("#grant#.DiligenceChecks == ''"),
-  grantNoEscalation: expr("#grant#.EscalationMinor == ''"),
+  principalUnverified: condition("Writ[0].PrincipalVerified == 'false'"),
+  grantUncapped: condition("#grant#.HasCap == 'false'"),
+  grantNoCount: condition("#grant#.CountMax == ''"),
+  grantNoAllowlist: condition("#grant#.AllowlistValues == ''"),
+  grantNoPattern: condition("#grant#.Pattern == ''"),
+  grantNoDiligence: condition("#grant#.DiligenceChecks == ''"),
+  grantNoEscalation: condition("#grant#.EscalationMinor == ''"),
 } as const;
 
 /* ------------------------------------------------------------- document */
@@ -201,9 +254,7 @@ export function writTemplateBlocks(): TemplateBlock[] {
       style: "tag",
       text: mdocText({
         name: "principalVerification",
-        value: expr(
-          "concat('1.2 The Principal\\'s legal entity has been corroborated against public registry data as at ', Writ[0].EffectiveFrom, '.')",
-        ),
+        content: "1.2 The legal entity of the Principal has been corroborated against public registry data as at {!Writ[0].EffectiveFrom}.",
         hidden: WRIT_CONDITIONS.principalUnverified,
       }),
     },
@@ -228,9 +279,7 @@ export function writTemplateBlocks(): TemplateBlock[] {
       style: "tag",
       text: mdocText({
         name: "dailyCeiling",
-        value: expr(
-          `concat('2.3 The Agent may not commit more than ', ${WRIT_EXPRESSIONS.dailyCapFormatted}, ' in any rolling 24-hour period, irrespective of the ceilings in clause 3.')`,
-        ),
+        content: `2.3 The Agent may not commit more than {!Writ[0].CurrencySymbol}${expr(WRIT_EXPRESSIONS.dailyCapAmount)} in any rolling 24-hour period, irrespective of the ceilings in clause 3.`,
         hidden: WRIT_CONDITIONS.noDailyCap,
       }),
     },
@@ -238,9 +287,7 @@ export function writTemplateBlocks(): TemplateBlock[] {
       style: "tag",
       text: mdocText({
         name: "escalationThreshold",
-        value: expr(
-          `concat('2.4 A single act with a value at or above ', ${WRIT_EXPRESSIONS.escalationThresholdFormatted}, ' — being ', Writ[0].EscalationPercent, '% of the aggregate ceiling — requires a fresh human decision and is not authorised by this writ alone.')`,
-        ),
+        content: `2.4 A single act with a value at or above {!Writ[0].CurrencySymbol}${expr(WRIT_EXPRESSIONS.escalationThresholdAmount)} — being {!Writ[0].EscalationPercent}% of the aggregate ceiling — requires a fresh human decision and is not authorised by this writ alone.`,
         hidden: WRIT_CONDITIONS.belowEscalationFloor,
       }),
     },
@@ -273,9 +320,7 @@ export function writTemplateBlocks(): TemplateBlock[] {
       style: "tag",
       text: mdocText({
         name: "grantCeiling",
-        value: expr(
-          `concat('Ceiling: ', ${SYMBOL}, setScale(toDecimal(${loopRef(GRANT_VAR, "CapMinor")}) / 100, 2), ' ', ${loopRef(GRANT_VAR, "CapWindow")}, ' — ', toPercent(toDecimal(${loopRef(GRANT_VAR, "CapMinor")}) / sum(${GRANTS}, 'CapMinor')), ' of the aggregate ceiling.')`,
-        ),
+        content: `Ceiling: {!Writ[0].CurrencySymbol}${expr(WRIT_EXPRESSIONS.grantCapAmount)} {!#grant#.CapWindow} — ${expr(WRIT_EXPRESSIONS.grantShareOfTotal)} of the aggregate ceiling.`,
         hidden: WRIT_CONDITIONS.grantUncapped,
       }),
     },
@@ -283,9 +328,7 @@ export function writTemplateBlocks(): TemplateBlock[] {
       style: "tag",
       text: mdocText({
         name: "grantFrequency",
-        value: expr(
-          `concat('Frequency: at most ', ${loopRef(GRANT_VAR, "CountMax")}, ' times ', ${loopRef(GRANT_VAR, "CountWindow")}, '.')`,
-        ),
+        content: "Frequency: at most {!#grant#.CountMax} times {!#grant#.CountWindow}.",
         hidden: WRIT_CONDITIONS.grantNoCount,
       }),
     },
@@ -293,9 +336,7 @@ export function writTemplateBlocks(): TemplateBlock[] {
       style: "tag",
       text: mdocText({
         name: "grantAllowlist",
-        value: expr(
-          `concat('Permitted values of ', ${loopRef(GRANT_VAR, "AllowlistField")}, ': ', ${loopRef(GRANT_VAR, "AllowlistValues")}, '. Any other value is outside this writ.')`,
-        ),
+        content: "Permitted values of {!#grant#.AllowlistField}: {!#grant#.AllowlistValues}. Any other value is outside this writ.",
         hidden: WRIT_CONDITIONS.grantNoAllowlist,
       }),
     },
@@ -303,9 +344,7 @@ export function writTemplateBlocks(): TemplateBlock[] {
       style: "tag",
       text: mdocText({
         name: "grantPattern",
-        value: expr(
-          `concat('The value of ', ${loopRef(GRANT_VAR, "PatternField")}, ' must match ', ${loopRef(GRANT_VAR, "Pattern")}, '.')`,
-        ),
+        content: "The value of {!#grant#.PatternField} must match {!#grant#.Pattern}.",
         hidden: WRIT_CONDITIONS.grantNoPattern,
       }),
     },
@@ -313,9 +352,7 @@ export function writTemplateBlocks(): TemplateBlock[] {
       style: "tag",
       text: mdocText({
         name: "grantDiligence",
-        value: expr(
-          `concat('Before committing this act the Agent must obtain a clear result for: ', ${loopRef(GRANT_VAR, "DiligenceChecks")}, '. An inconclusive result is treated as a failure.')`,
-        ),
+        content: "Before committing this act the Agent must obtain a clear result for: {!#grant#.DiligenceChecks}. An inconclusive result is treated as a failure.",
         hidden: WRIT_CONDITIONS.grantNoDiligence,
       }),
     },
@@ -323,9 +360,7 @@ export function writTemplateBlocks(): TemplateBlock[] {
       style: "tag",
       text: mdocText({
         name: "grantEscalation",
-        value: expr(
-          `concat('Acts of this class above ', ${SYMBOL}, setScale(toDecimal(${loopRef(GRANT_VAR, "EscalationMinor")}) / 100, 2), ' require a fresh human decision.')`,
-        ),
+        content: `Acts of this class above {!Writ[0].CurrencySymbol}${expr(WRIT_EXPRESSIONS.grantEscalationAmount)} require a fresh human decision.`,
         hidden: WRIT_CONDITIONS.grantNoEscalation,
       }),
     },
@@ -353,9 +388,7 @@ export function writTemplateBlocks(): TemplateBlock[] {
       style: "tag",
       text: mdocText({
         name: "eidasClause",
-        value: expr(
-          "concat('4.2 The Principal\\'s signature is an advanced electronic signature within the meaning of Regulation (EU) No 910/2014 (eIDAS), applied in PAdES form, and may not be denied legal effect on the sole ground that it is in electronic form.')",
-        ),
+        content: "4.2 The signature of the Principal is an advanced electronic signature within the meaning of Regulation (EU) No 910/2014 (eIDAS), applied in PAdES form, and may not be denied legal effect on the sole ground that it is in electronic form.",
         hidden: WRIT_CONDITIONS.notEea,
       }),
     },
@@ -363,9 +396,7 @@ export function writTemplateBlocks(): TemplateBlock[] {
       style: "tag",
       text: mdocText({
         name: "nonEeaClause",
-        value: expr(
-          "concat('4.2 The Principal\\'s signature is an electronic signature under the law of ', Writ[0].JurisdictionName, ', and the parties agree that it satisfies any requirement of writing or signature under that law.')",
-        ),
+        content: "4.2 The signature of the Principal is an electronic signature under the law of {!Writ[0].JurisdictionName}, and the parties agree that it satisfies any requirement of writing or signature under that law.",
         hidden: WRIT_CONDITIONS.isEea,
       }),
     },
@@ -373,9 +404,7 @@ export function writTemplateBlocks(): TemplateBlock[] {
       style: "tag",
       text: mdocText({
         name: "ukClause",
-        value: expr(
-          "concat('4.3 Nothing in this writ displaces section 7 of the Electronic Communications Act 2000 as to the admissibility of the Principal\\'s signature.')",
-        ),
+        content: "4.3 Nothing in this writ displaces section 7 of the Electronic Communications Act 2000 as to the admissibility of the signature of the Principal.",
         hidden: WRIT_CONDITIONS.notUk,
       }),
     },
