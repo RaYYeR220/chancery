@@ -54,11 +54,12 @@ export const DEMO_SCRIPT: DemoStep[] = [
     id: "D-02",
     kind: "boundary",
     narration:
-      "Then it tries to send a supply agreement for signature — and gets a 401. It has no signing " +
-      "credentials, because nothing in the agent's process ever holds any.",
+      "Then it tries to send a supply agreement for signature, and Foxit turns it away. It holds no " +
+      "signing credential, because nothing in the agent's process ever holds one.",
     vendor: "foxit",
     watch:
-      "A real HTTP 401 from Foxit, not a refusal message. The boundary is the credential, not a prompt.",
+      "A real 400 from Foxit — allow:false, missing credentials — not a message we wrote. " +
+      "Reproduce it with pnpm boundary. The boundary is the credential, not a prompt.",
   },
   {
     id: "D-03",

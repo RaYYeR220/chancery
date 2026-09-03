@@ -50,7 +50,7 @@ A human signs a **writ**: a document stating exactly which irreversible acts an 
 
 | | Does what | Why it is load-bearing |
 | --- | --- | --- |
-| **Foxit** | 40 reversible PDF tools over MCP; eSign for the human signature | The agent process holds **no eSign credential**, so an agent that tries to send for signature gets a real 401. The boundary is a credential, not a prompt. |
+| **Foxit** | 40 reversible PDF tools over MCP; eSign for the human signature | The agent process holds **no Foxit credential at all**, so an agent that tries to send for signature is refused by Foxit — a real `400 {"allow":false,...}`, not a message we wrote. `pnpm boundary` reproduces it. We also tested the obvious alternative, relying on Foxit to scope a PDF Services key away from eSign, and **found it does not hold** — which is why the boundary is about who holds a credential rather than what one is scoped to. |
 | **Doctavian** | Generates the writ | The terms loop over granted acts, branch nine ways on jurisdiction and on which limits are set, and compute the ceiling, the expiry and the escalation threshold. Mail-merge could not produce this document. |
 | **Nutrient** | Reads the signed PDF back into terms | The grounding gate. A field that did not ground makes its clause unenforceable — which is the entire premise of the product. |
 | **name.com** | Registration + the DNS anchor | Registration is the second irreversible act we gate. DNS is where authority is published and revoked. Search, registration, record CRUD and DNSSEC. |
@@ -64,6 +64,10 @@ A human signs a **writ**: a document stating exactly which irreversible acts an 
 2. **Every unknown denies.** A diligence check that times out, a signature that could not be verified, a confidence score that is absent, a constraint that cannot be parsed — all of them refuse. Benchmark scenarios `T-02`, `T-03`, `T-08`, `T-12`.
 
 3. **A denial is the product working.** It names the clause, the page and the box on that page, so the human can see the sentence they wrote being enforced.
+
+## One thing to read if you read nothing else
+
+The **negative result** in [`CLAIMS.md`](./CLAIMS.md). We claimed the signing boundary held because a PDF Services key is not eSign-entitled, tested it against the live API, and found that false — and our own probe had a bug that would have reported success either way. Both are fixed, the claim is marked `DISPROVED`, and three tests pin the real response shapes. It is the clearest evidence we could offer that the rest of this file is checked rather than asserted.
 
 ## Honesty artefacts
 
