@@ -235,6 +235,41 @@ async function checkFoxit(): Promise<void> {
   }
 }
 
+/* --------------------------------------------------------------- Doctavian */
+
+async function checkDoctavian(): Promise<void> {
+  const base = process.env.DOCTAVIAN_BASE_URL;
+  const key = process.env.DOCTAVIAN_DOCUMENTS_KEY;
+  const bearer = process.env.DOCTAVIAN_BEARER;
+  if (!base || !key || !bearer) {
+    return record("Doctavian", "documents list", "skip", "credentials not set");
+  }
+
+  try {
+    const response = await fetch(`${base}/v1/documents/document/list`, {
+      headers: { authorization: `Bearer ${bearer}`, "x-api-key": key, accept: "application/json" },
+    });
+    const body = (await response.json()) as {
+      result?: { data?: { rowCount?: number } };
+      error?: { innerErrors?: { message?: string }[] };
+    };
+    if (!response.ok) {
+      // The access token lasts an hour; an expired one is the usual cause here
+      // and is worth naming rather than reporting as a generic failure.
+      const detail = body.error?.innerErrors?.[0]?.message ?? `HTTP ${response.status}`;
+      return record("Doctavian", "documents list", "fail", detail);
+    }
+    record(
+      "Doctavian",
+      "documents list",
+      "ok",
+      `${body.result?.data?.rowCount ?? 0} documents on the demo tenant`,
+    );
+  } catch (error) {
+    record("Doctavian", "documents list", "fail", message(error));
+  }
+}
+
 /* ---------------------------------------------------------------- name.com */
 
 async function checkNameCom(): Promise<void> {
@@ -294,6 +329,7 @@ async function main(): Promise<number> {
   await checkNutrient();
   await checkSerpApi();
   await checkFoxit();
+  await checkDoctavian();
   await checkNameCom();
 
   const failed = checks.filter((c) => c.status === "fail").length;
