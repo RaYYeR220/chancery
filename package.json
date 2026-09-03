@@ -16,7 +16,8 @@
     "demo": "tsx src/cli/demo.ts",
     "smoke": "tsx src/cli/smoke.ts",
     "anchor": "tsx src/cli/anchor.ts",
-    "boundary": "tsx src/cli/boundary.ts"
+    "boundary": "tsx src/cli/boundary.ts",
+    "issue": "tsx src/cli/issue.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

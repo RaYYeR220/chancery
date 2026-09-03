@@ -750,10 +750,14 @@ export class ProcessorClient {
    */
   async analyzeBuild(request: BuildRequest): Promise<NutrientResult<AnalyzeBuildResult>> {
     assertBuildInstructions(request.instructions);
+    // Confirmed live: unlike `/build`, this endpoint takes JSON and rejects
+    // multipart outright with a 415. It never reads the files — it is planning
+    // the pipeline, not running it — so sending only the instructions is both
+    // correct and the reason the call is free.
     return nutrientRequest<AnalyzeBuildResult>(this.config, {
       method: "POST",
       path: "/analyze_build",
-      body: buildForm(request.instructions, request.files ?? {}),
+      body: JSON.stringify(request.instructions),
       expect: "json",
     });
   }

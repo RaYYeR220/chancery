@@ -52,7 +52,8 @@ Every public statement we make about Chancery, tagged by what actually backs it.
 | The gate keys on the match kind, not on a confidence number, and there is no default threshold. | REPRODUCIBLE | `src/lib/adapters/nutrient/grounding.ts`; a `fuzzy_match` at 0.99 confidence does not ground. |
 | Confidence is never presented as a probability or a percentage. | REPRODUCIBLE | A test asserts no rendered finding contains `%`. |
 | The Nutrient account and its free execution planner respond. | **VERIFIED-LIVE** | `pnpm smoke` reports the credit balance and runs `analyze_build`, which returns the execution plan a Build would follow and costs nothing. |
-| Extraction against the live API produces these citations for our writ. | *pending* | The free tier is 50 credits and one page of schema-bound extraction costs 15, so this is run deliberately rather than casually. |
+| A writ is rendered to PDF/A and cryptographically signed by the live API. | **VERIFIED-LIVE** | `pnpm issue`. HTML to PDF/A through the Build API, then `/sign`; the signed bytes are hashed and that hash is what goes into DNS. |
+| Extraction against the live API produces these citations for our writ. | *pending* | Blocked on nothing but time; the account was topped up to 500,000 credits. |
 
 ## Diligence
 
