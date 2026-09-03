@@ -104,7 +104,31 @@ curl -s 'https://x8ki-letl-twmt.n7.xano.io/api:chancery-verify/verify?domain=ops
 
 Public, read-only, no auth.
 
-## 5. A domain registered and authority published to it, through the real API
+## 5. A live writ, on a real domain, that a stranger can check
+
+**https://chancery.live** — the deployed product. No account, no login.
+
+```bash
+dig +short TXT _writ.chancery.live
+```
+
+```
+"v=WRIT1; st=active; k=MCowBQYDK2VwAyEAGb9ECWmEzf6FQbrBZ9w7lshQhqowtrbLDFw4rXAxZuE;
+  h=DJFCbC3nwknF6XUaOH9xIRBRWCSd6-UL4GiXzdiQjAs; u=https://chancery.live/w/1.pdf; exp=1796083200"
+```
+
+Then fetch what it points at and hash it:
+
+```bash
+curl -s https://chancery.live/w/1.pdf | openssl dgst -sha256 -binary | basenc --base64url | tr -d '='
+# DJFCbC3nwknF6XUaOH9xIRBRWCSd6-UL4GiXzdiQjAs
+```
+
+The two agree. That document was rendered from the `Writ` object the engine enforces, converted to PDF/A and cryptographically signed through Nutrient, and its hash was written into DNS by the name.com API — nothing in that chain is simulated.
+
+`pnpm verify chancery.live` does all of it for you and reports one honest warning: the zone is **not DNSSEC-signed**, so a strict verifier treats the authority as unverified. We report that rather than suppressing it, because a revocation could be stripped in transit from an unvalidated answer — see the limits below.
+
+## 6. A domain registered and authority published to it, through the real API
 
 ```bash
 pnpm anchor
@@ -121,7 +145,7 @@ u=https://chancery.dev/w/chancerywrit; exp=1796169524
 
 **The sandbox zone never resolves publicly**, so that read-back went through the registrar's API — which is *not* the verification path, and the script says so rather than letting it pass for one. See `MOCKS.md`.
 
-## 6. Authority resolved from public DNS
+## 7. Authority resolved from public DNS
 
 ```bash
 pnpm verify example.com
@@ -155,7 +179,7 @@ Real DNS-over-HTTPS against a zone we do not control, reporting the DNSSEC Authe
 
 Listed here rather than left for you to notice:
 
-- **No writ resolves from public DNS yet.** That needs a production registration; the sandbox zone is real but private. Everything else about the anchor is proven.
+- **The published zone is not DNSSEC-signed.** `chancery.live` resolves and the hash matches, but the answer carries no AD flag, so a strict verifier reports the authority as unverified and denies. Running it needs `CHANCERY_ALLOW_UNAUTHENTICATED_DNS=true`, and every decision made under that flag says so in its own reasons.
 - **The search fixtures are captured-shape, not captured.** Built to each engine's documented structure. A field name we got wrong surfaces as `unknown`, which denies — not as a false pass.
 - **Extraction is run deliberately, not casually.** The free tier is 50 credits and one page of schema-bound extraction costs 15.
 - **A free-tier signature chains to a test certificate**, not a publicly trusted root. Cryptographically real; not a production trust anchor.

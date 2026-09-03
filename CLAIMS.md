@@ -31,7 +31,8 @@ Every public statement we make about Chancery, tagged by what actually backs it.
 | DNSSEC validation is required by default; an unvalidated answer is reported as unverified rather than trusted. | REPRODUCIBLE | Benchmark scenario R-16. The opt-out is explicit and every decision made under it says so in its own reasons. |
 | Revocation is published as a tombstone that outranks any active record, whatever its expiry. | REPRODUCIBLE | Benchmark scenario T-01. |
 | A domain is registered and a WRIT1 record published to it through the registrar's real API. | **VERIFIED-LIVE** | `pnpm anchor`. Search, registration and the DNS write all run against name.com; the record is then read back. In the sandbox that read-back goes through the registrar, which is **not** the verification path, and the script says so. |
-| A writ resolves from public resolvers, so a stranger can verify it. | *pending* | Needs a production registration. The sandbox zone is real but never resolves publicly. See `MOCKS.md`. |
+| **A writ resolves from public resolvers, and the document it points at hashes to the published value.** | **VERIFIED-LIVE** | `dig +short TXT _writ.chancery.live`, then hash `https://chancery.live/w/1.pdf`. Both give `DJFCbC3nwknF6XUaOH9xIRBRWCSd6-UL4GiXzdiQjAs`. |
+| The published zone is DNSSEC-signed. | **NOT TRUE** | It is not. The verifier reports the authority as unverified and denies by default; the opt-out is explicit and recorded in every decision made under it. |
 
 ## The signature boundary
 
