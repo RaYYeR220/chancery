@@ -4,6 +4,17 @@
 
 An AI can draft it. Only a human can commit to it.
 
+**[chancery.live](https://chancery.live)** · [the public verifier](https://chancery.live/verify) · [the ledger](https://x8ki-letl-twmt.n7.xano.io/api:chancery-verify/ledger/spine)
+
+Check it without taking our word for anything:
+
+```bash
+dig +short TXT _writ.chancery.live
+curl -s https://chancery.live/w/1.pdf | openssl dgst -sha256 -binary | basenc --base64url | tr -d '='
+```
+
+The `h=` in the record and the hash of the document it points at are the same value. That document was rendered from the same `Writ` object the engine enforces, converted to PDF/A, cryptographically signed, and its hash written into DNS through the registrar's API.
+
 ---
 
 ## The problem
@@ -76,13 +87,22 @@ See [`CLAIMS.md`](./CLAIMS.md) for every public statement tagged by what backs i
 
 ## Run it
 
-Two things run with **no credentials, no network and no account**:
+Four things run with **no credentials, no network and no account**:
 
 ```bash
 pnpm install
 
-pnpm bench                      # the decision benchmark: 35 scenarios, answer key declared up front
-pnpm verify example.com         # resolve an agent's authority from live public DNS
+pnpm bench                        # the decision benchmark: 35 scenarios, answer key declared up front
+pnpm demo                         # the whole walkthrough, narrated, with real verdicts
+pnpm verify chancery.live         # resolve a live agent's authority from public DNS
+pnpm verify --bundle evidence/D-10.json   # re-derive a published verdict offline
+```
+
+Two more need only a network, not an account:
+
+```bash
+pnpm boundary                     # make Foxit refuse us, live, and print what it said
+pnpm smoke                        # call every integration for real and report what came back
 ```
 
 `pnpm bench` prints a scorecard. Six acts that must go through, sixteen that must not, and thirteen traps where a plausible implementation gets it wrong — a revocation hiding behind a longer-lived record, a diligence check that timed out, an instruction smuggled into the signed document as prose.
@@ -124,6 +144,7 @@ pnpm verify --bundle path/to/decision.json
 - **A registrar sandbox does not serve signed zones.** DNSSEC validation is required by default and a verifier that cannot confirm it reports the authority as unverified. Running against a sandbox therefore needs an explicit opt-out, and every decision made under that opt-out says so in its own reasons.
 - **A free-tier signature is a test certificate.** It is cryptographically real and it is not a production trust anchor. We do not present it as one.
 - **Diligence is evidence, not adjudication.** A trademark search is a strong signal and not a legal opinion. Findings carry their sources so a human can judge them.
+- **The published zone is not DNSSEC-signed.** `chancery.live` resolves and its hash matches, but the answer carries no AD flag, so a strict verifier reports the authority as unverified and denies. Running against it needs `CHANCERY_ALLOW_UNAUTHENTICATED_DNS=true`, and every decision made under that flag records that it was.
 - **`domain.register` is the only act with an executor wired.** The others are modelled end to end and gated identically, but only one of them spends money today.
 
 ## Licence
