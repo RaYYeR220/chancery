@@ -5,7 +5,6 @@ Every public statement we make about Chancery, tagged by what actually backs it.
 | Tier | Meaning |
 | --- | --- |
 | **REPRODUCIBLE** | You can re-run it yourself, from this repo, with no credentials and no account. |
-| **VERIFIED-LIVE** | We ran it against the real third-party service and kept the output. |
 | **VERIFIED-LIVE** | We called the real third-party service and kept what came back. `pnpm smoke` re-runs every one of these. |
 | **MODELED** | Implemented, typed and tested against the vendor's documented contract — but not yet exercised against a live credential. |
 | **NOT-CLAIMED** | Something a reader might reasonably assume, that we are explicitly *not* asserting. |
